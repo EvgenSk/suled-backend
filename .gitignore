@@ -1,0 +1,75 @@
+# .gitignore for suled-backend
+
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.pdb
+*.log
+*.vsix
+*.vsixmanifest
+
+## Azure Functions
+local.settings.json
+__blobstorage__
+__queuestorage__
+__azurite_db*__.json
+.python_packages/
+
+## Visual Studio
+.vs/
+.vscode/
+*.swp
+*.*~
+project.lock.json
+.DS_Store
+*.pyc
+nupkg/
+
+## Test Results
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+## Build artifacts
+*.dll
+*.exe
+*.out
+*.app
+
+## NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+
+## Rider
+.idea/
+*.sln.iml
+
+## Environment
+.env
+.env.local
+.env.*.local
+
+## Azure
+*.PublishSettings
+*.azurePubxml
+*.pubxml
+*.publishproj
+
+## Bicep
+*.bicep.json
+
+## macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+## Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini

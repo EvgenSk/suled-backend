@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageId>Suled.Contracts</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Suled Team</Authors>
+    <Description>Shared API contracts and DTOs for Suled tournament management system</Description>
+    <PackageTags>suled;tournament;api;contracts</PackageTags>
+  </PropertyGroup>
+
+</Project>
