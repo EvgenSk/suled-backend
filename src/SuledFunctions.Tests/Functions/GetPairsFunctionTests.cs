@@ -3,14 +3,14 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using SuledFunctions.Functions;
 using SuledFunctions.Models;
 using SuledFunctions.Services;
+using SuledFunctions.Tests.Helpers;
 using System.Net;
-using System.Text;
 using System.Text.Json;
-using Xunit;
 
 namespace SuledFunctions.Tests.Functions;
 
@@ -22,8 +22,8 @@ public class GetPairsFunctionTests
     public GetPairsFunctionTests()
     {
         _loggerMock = new Mock<ILogger<GetPairsFunction>>();
-        var pairServiceMock = new Mock<IPairService>();
-        _function = new GetPairsFunction(_loggerMock.Object, pairServiceMock.Object);
+        var pairService = new PairService(); // Use real service instead of mock
+        _function = new GetPairsFunction(_loggerMock.Object, pairService);
     }
 
     [Fact]
@@ -133,8 +133,8 @@ public class GetPairsFunctionTests
         // Verify alphabetical ordering
         for (int i = 0; i < pairs.Count - 1; i++)
         {
-            var currentDisplayName = pairs[i].GetProperty("DisplayName").GetString();
-            var nextDisplayName = pairs[i + 1].GetProperty("DisplayName").GetString();
+            var currentDisplayName = pairs[i].GetProperty("displayName").GetString();
+            var nextDisplayName = pairs[i + 1].GetProperty("displayName").GetString();
             string.Compare(currentDisplayName, nextDisplayName, StringComparison.Ordinal)
                 .Should().BeLessThanOrEqualTo(0);
         }
@@ -154,10 +154,10 @@ public class GetPairsFunctionTests
         var content = await GetResponseContent(response);
         var firstPair = content!.RootElement.GetProperty("pairs")[0];
         
-        firstPair.TryGetProperty("Id", out _).Should().BeTrue();
-        firstPair.TryGetProperty("DisplayName", out _).Should().BeTrue();
-        firstPair.TryGetProperty("Player1", out _).Should().BeTrue();
-        firstPair.TryGetProperty("Player2", out _).Should().BeTrue();
+        firstPair.TryGetProperty("id", out _).Should().BeTrue();
+        firstPair.TryGetProperty("displayName", out _).Should().BeTrue();
+        firstPair.TryGetProperty("player1", out _).Should().BeTrue();
+        firstPair.TryGetProperty("player2", out _).Should().BeTrue();
     }
 
     [Fact]
@@ -207,6 +207,13 @@ public class GetPairsFunctionTests
         var serviceCollection = new ServiceCollection();
         serviceCollection.AddScoped<ILoggerFactory, LoggerFactory>();
         
+        // Configure serializer for WriteAsJsonAsync
+        var workerOptions = Options.Create(new Microsoft.Azure.Functions.Worker.WorkerOptions
+        {
+            Serializer = new TestJsonSerializer()
+        });
+        serviceCollection.AddSingleton(workerOptions);
+        
         var serviceProvider = serviceCollection.BuildServiceProvider();
         
         var context = new Mock<FunctionContext>();
@@ -219,18 +226,6 @@ public class GetPairsFunctionTests
         responseMock.SetupProperty(r => r.StatusCode);
         responseMock.SetupProperty(r => r.Body, responseStream);
         responseMock.Setup(r => r.Headers).Returns(new HttpHeadersCollection());
-        
-        // Mock WriteAsJsonAsync to manually serialize JSON
-        responseMock.Setup(r => r.WriteAsJsonAsync(It.IsAny<object>(), It.IsAny<CancellationToken>()))
-            .Returns<object, CancellationToken>(async (obj, ct) =>
-            {
-                var json = JsonSerializer.Serialize(obj, new JsonSerializerOptions 
-                { 
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase 
-                });
-                var bytes = Encoding.UTF8.GetBytes(json);
-                await responseStream.WriteAsync(bytes, 0, bytes.Length, ct);
-            });
         
         requestMock.Setup(r => r.CreateResponse()).Returns(responseMock.Object);
         

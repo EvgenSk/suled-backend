@@ -3,14 +3,14 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using SuledFunctions.Functions;
 using SuledFunctions.Models;
 using SuledFunctions.Services;
+using SuledFunctions.Tests.Helpers;
 using System.Net;
-using System.Text;
 using System.Text.Json;
-using Xunit;
 
 namespace SuledFunctions.Tests.Functions;
 
@@ -22,8 +22,8 @@ public class GetGamesForPairFunctionTests
     public GetGamesForPairFunctionTests()
     {
         _loggerMock = new Mock<ILogger<GetGamesForPairFunction>>();
-        var gameServiceMock = new Mock<IGameService>();
-        _function = new GetGamesForPairFunction(_loggerMock.Object, gameServiceMock.Object);
+        var gameService = new GameService(); // Use real service instead of mock
+        _function = new GetGamesForPairFunction(_loggerMock.Object, gameService);
     }
 
     [Fact]
@@ -103,17 +103,17 @@ public class GetGamesForPairFunctionTests
         games.Should().HaveCount(4);
         
         // Verify ordering: Round 1 Court 1, Round 1 Court 2, Round 2 Court 2, Round 2 Court 3
-        games[0].GetProperty("Round").GetInt32().Should().Be(1);
-        games[0].GetProperty("CourtNumber").GetInt32().Should().Be(1);
+        games[0].GetProperty("round").GetInt32().Should().Be(1);
+        games[0].GetProperty("courtNumber").GetInt32().Should().Be(1);
         
-        games[1].GetProperty("Round").GetInt32().Should().Be(1);
-        games[1].GetProperty("CourtNumber").GetInt32().Should().Be(2);
+        games[1].GetProperty("round").GetInt32().Should().Be(1);
+        games[1].GetProperty("courtNumber").GetInt32().Should().Be(2);
         
-        games[2].GetProperty("Round").GetInt32().Should().Be(2);
-        games[2].GetProperty("CourtNumber").GetInt32().Should().Be(2);
+        games[2].GetProperty("round").GetInt32().Should().Be(2);
+        games[2].GetProperty("courtNumber").GetInt32().Should().Be(2);
         
-        games[3].GetProperty("Round").GetInt32().Should().Be(2);
-        games[3].GetProperty("CourtNumber").GetInt32().Should().Be(3);
+        games[3].GetProperty("round").GetInt32().Should().Be(2);
+        games[3].GetProperty("courtNumber").GetInt32().Should().Be(3);
     }
 
     [Fact]
@@ -147,7 +147,7 @@ public class GetGamesForPairFunctionTests
         // Assert
         var content = await GetResponseContent(response);
         var game = content!.RootElement.GetProperty("games")[0];
-        game.GetProperty("IsOurGame").GetBoolean().Should().BeTrue();
+        game.GetProperty("isOurGame").GetBoolean().Should().BeTrue();
     }
 
     [Fact]
@@ -181,7 +181,7 @@ public class GetGamesForPairFunctionTests
         // Assert
         var content = await GetResponseContent(response);
         var game = content!.RootElement.GetProperty("games")[0];
-        game.GetProperty("IsOurGame").GetBoolean().Should().BeFalse();
+        game.GetProperty("isOurGame").GetBoolean().Should().BeFalse();
     }
 
     [Fact]
@@ -199,14 +199,14 @@ public class GetGamesForPairFunctionTests
         var content = await GetResponseContent(response);
         var game = content!.RootElement.GetProperty("games")[0];
         
-        game.TryGetProperty("Id", out _).Should().BeTrue();
-        game.TryGetProperty("Round", out _).Should().BeTrue();
-        game.TryGetProperty("CourtNumber", out _).Should().BeTrue();
-        game.TryGetProperty("Status", out _).Should().BeTrue();
-        game.TryGetProperty("ScheduledTime", out _).Should().BeTrue();
-        game.TryGetProperty("Pair1", out _).Should().BeTrue();
-        game.TryGetProperty("Pair2", out _).Should().BeTrue();
-        game.TryGetProperty("IsOurGame", out _).Should().BeTrue();
+        game.TryGetProperty("id", out _).Should().BeTrue();
+        game.TryGetProperty("round", out _).Should().BeTrue();
+        game.TryGetProperty("courtNumber", out _).Should().BeTrue();
+        game.TryGetProperty("status", out _).Should().BeTrue();
+        game.TryGetProperty("scheduledTime", out _).Should().BeTrue();
+        game.TryGetProperty("pair1", out _).Should().BeTrue();
+        game.TryGetProperty("pair2", out _).Should().BeTrue();
+        game.TryGetProperty("isOurGame", out _).Should().BeTrue();
     }
 
     [Fact]
@@ -270,6 +270,13 @@ public class GetGamesForPairFunctionTests
         var serviceCollection = new ServiceCollection();
         serviceCollection.AddScoped<ILoggerFactory, LoggerFactory>();
         
+        // Configure serializer for WriteAsJsonAsync
+        var workerOptions = Options.Create(new Microsoft.Azure.Functions.Worker.WorkerOptions
+        {
+            Serializer = new TestJsonSerializer()
+        });
+        serviceCollection.AddSingleton(workerOptions);
+        
         var serviceProvider = serviceCollection.BuildServiceProvider();
         
         var context = new Mock<FunctionContext>();
@@ -282,18 +289,6 @@ public class GetGamesForPairFunctionTests
         responseMock.SetupProperty(r => r.StatusCode);
         responseMock.SetupProperty(r => r.Body, responseStream);
         responseMock.Setup(r => r.Headers).Returns(new HttpHeadersCollection());
-        
-        // Mock WriteAsJsonAsync to manually serialize JSON
-        responseMock.Setup(r => r.WriteAsJsonAsync(It.IsAny<object>(), It.IsAny<CancellationToken>()))
-            .Returns<object, CancellationToken>(async (obj, ct) =>
-            {
-                var json = JsonSerializer.Serialize(obj, new JsonSerializerOptions 
-                { 
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase 
-                });
-                var bytes = Encoding.UTF8.GetBytes(json);
-                await responseStream.WriteAsync(bytes, 0, bytes.Length, ct);
-            });
         
         requestMock.Setup(r => r.CreateResponse()).Returns(responseMock.Object);
         

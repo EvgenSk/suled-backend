@@ -4,7 +4,6 @@ using Moq;
 using OfficeOpenXml;
 using SuledFunctions.Models;
 using SuledFunctions.Services;
-using Xunit;
 
 namespace SuledFunctions.Tests.Services;
 

@@ -3,14 +3,15 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using SuledFunctions.Functions;
 using SuledFunctions.Models;
 using SuledFunctions.Services;
+using SuledFunctions.Tests.Helpers;
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using Xunit;
 
 namespace SuledFunctions.Tests.Functions;
 
@@ -267,6 +268,13 @@ public class UploadTournamentFunctionTests
         var serviceCollection = new ServiceCollection();
         serviceCollection.AddScoped<ILoggerFactory, LoggerFactory>();
         
+        // Configure serializer for WriteAsJsonAsync
+        var workerOptions = Options.Create(new Microsoft.Azure.Functions.Worker.WorkerOptions
+        {
+            Serializer = new TestJsonSerializer()
+        });
+        serviceCollection.AddSingleton(workerOptions);
+        
         var serviceProvider = serviceCollection.BuildServiceProvider();
         
         var context = new Mock<FunctionContext>();
@@ -282,18 +290,6 @@ public class UploadTournamentFunctionTests
         responseMock.SetupProperty(r => r.StatusCode);
         responseMock.SetupProperty(r => r.Body, responseStream);
         responseMock.Setup(r => r.Headers).Returns(new HttpHeadersCollection());
-        
-        // Mock WriteAsJsonAsync to manually serialize JSON
-        responseMock.Setup(r => r.WriteAsJsonAsync(It.IsAny<object>(), It.IsAny<CancellationToken>()))
-            .Returns<object, CancellationToken>(async (obj, ct) =>
-            {
-                var json = JsonSerializer.Serialize(obj, new JsonSerializerOptions 
-                { 
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase 
-                });
-                var bytes = Encoding.UTF8.GetBytes(json);
-                await responseStream.WriteAsync(bytes, 0, bytes.Length, ct);
-            });
         
         requestMock.Setup(r => r.CreateResponse()).Returns(responseMock.Object);
         

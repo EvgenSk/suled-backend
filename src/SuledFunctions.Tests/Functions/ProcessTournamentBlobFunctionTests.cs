@@ -185,7 +185,7 @@ public class ProcessTournamentBlobFunctionTests
                 x => x.Log(
                     LogLevel.Information,
                     It.IsAny<EventId>(),
-                    It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains(size.ToString())),
+                    It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains($"Size: {size} bytes")),
                     null,
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
                 Times.Once,
