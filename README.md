@@ -15,12 +15,13 @@ suled-backend/
 │   └── workflows/          # CI/CD pipelines
 │       └── backend-ci.yml  # Main CI/CD workflow
 ├── src/
-│   ├── SuledFunctions/           # Azure Functions project
-│   │   ├── Functions/            # HTTP triggers
-│   │   ├── Models/               # Domain models
-│   │   └── Services/             # Business logic
-│   ├── SuledFunctions.Tests/     # Unit tests
-│   └── SuledFunctions.Contracts/ # Shared API DTOs (NuGet package)
+│   ├── SuledFunctions/            # Azure Functions project
+│   │   ├── Functions/             # HTTP triggers
+│   │   ├── Models/                # Domain models
+│   │   └── Services/              # Business logic
+│   ├── SuledFunctions.Tests/      # Unit tests (67 tests)
+│   ├── SuledFunctions.IntegrationTests/  # Integration tests (22 tests)
+│   └── SuledFunctions.Contracts/  # Shared API DTOs (NuGet package)
 ├── infra/
 │   ├── main.bicep          # Infrastructure as Code
 │   └── main.bicepparam     # Bicep parameters
@@ -148,19 +149,53 @@ func azure functionapp publish <function-app-name>
 
 ## Testing
 
-### Run all tests
-```powershell
-dotnet test
-```
+The project includes comprehensive test coverage at multiple levels:
 
-### Run with coverage
-```powershell
-dotnet test --collect:"XPlat Code Coverage"
-```
+### Unit Tests (67 tests)
 
-### Run specific test class
+Located in `src/SuledFunctions.Tests/`:
+- **Service Tests**: ExcelParserService, PairService, GameService
+- **Function Tests**: All HTTP and blob-triggered functions
+- **Fast execution**: ~2 seconds for full suite
+
 ```powershell
+# Run all unit tests
+dotnet test src/SuledFunctions.Tests
+
+# Run with coverage
+dotnet test src/SuledFunctions.Tests --collect:"XPlat Code Coverage"
+
+# Run specific test class
 dotnet test --filter "FullyQualifiedName~GetPairsFunctionTests"
+```
+
+### Integration Tests (22 tests)
+
+Located in `src/SuledFunctions.IntegrationTests/`:
+- **Blob Storage**: Upload, download, metadata
+- **Cosmos DB**: CRUD operations, queries
+- **End-to-End**: Complete tournament workflows
+- **Requires Docker**: Uses Testcontainers for Azure emulators
+
+```powershell
+# Ensure Docker Desktop is running first!
+docker --version
+
+# Run all integration tests
+dotnet test src/SuledFunctions.IntegrationTests
+
+# Run specific test category
+dotnet test --filter "FullyQualifiedName~BlobStorage"
+dotnet test --filter "FullyQualifiedName~EndToEnd"
+```
+
+See [Integration Tests README](src/SuledFunctions.IntegrationTests/README.md) for detailed setup and troubleshooting.
+
+### Run All Tests
+
+```powershell
+# Run both unit and integration tests
+dotnet test
 ```
 
 ## Architecture
@@ -189,8 +224,11 @@ dotnet test --filter "FullyQualifiedName~GetPairsFunctionTests"
 
 ### Testing
 - Write unit tests for all services
-- Mock external dependencies (Cosmos DB, Blob Storage)
+- Write integration tests for critical workflows
+- Mock external dependencies in unit tests
+- Use real emulators (Azurite, Cosmos DB) in integration tests
 - Aim for >80% code coverage
+- Ensure Docker is running for integration tests
 
 ### API Versioning
 - Use route prefixes for versioning: `/api/v1/pairs`
