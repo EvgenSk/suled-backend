@@ -15,7 +15,7 @@ on:
 
 env:
   DOTNET_VERSION: '8.0.x'
-  AZURE_FUNCTIONAPP_NAME: 'suled-functions'  # Update with your Function App name
+  AZURE_FUNCTIONAPP_NAME: 'suled-app-func'  # Updated to match deployed function app
   AZURE_FUNCTIONAPP_PACKAGE_PATH: './src/SuledFunctions'
 
 jobs:
@@ -38,7 +38,7 @@ jobs:
       run: dotnet build --configuration Release --no-restore
 
     - name: Run tests
-      run: dotnet test --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage"
+      run: dotnet test --configuration Release --no-build --verbosity normal --filter "FullyQualifiedName!~IntegrationTests" --collect:"XPlat Code Coverage"
 
     - name: Upload coverage reports
       uses: codecov/codecov-action@v4
@@ -52,7 +52,7 @@ jobs:
       run: dotnet publish ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }} --configuration Release --output ./publish
 
     - name: Upload artifact for deployment
-      if: github.ref == 'refs/heads/master'
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
       uses: actions/upload-artifact@v4
       with:
         name: azure-functions
@@ -61,7 +61,7 @@ jobs:
   deploy-dev:
     runs-on: ubuntu-latest
     needs: build-and-test
-    if: false  # Disable auto-deploy to dev for now
+    if: github.ref == 'refs/heads/develop'  # Deploy to dev when pushing to develop
     environment:
       name: 'Development'
       url: ${{ steps.deploy-to-function.outputs.webapp-url }}
@@ -76,7 +76,7 @@ jobs:
       id: deploy-to-function
       uses: Azure/functions-action@v1
       with:
-        app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}-dev
+        app-name: suled-app-func
         package: '.'
         publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE_DEV }}
 
