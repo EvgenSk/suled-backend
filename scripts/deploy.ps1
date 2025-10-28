@@ -14,7 +14,7 @@ Write-Host "🚀 Deploying Suled Backend to $Environment environment..." -Foregr
 # Configuration
 $ResourceGroupName = if ($Environment -eq 'dev') { "suled-rg-dev" } else { "suled-rg-prod" }
 $FunctionAppName = if ($Environment -eq 'dev') { "suled-functions-dev" } else { "suled-functions" }
-$Location = "eastus"
+$Location = "northeurope"  # Ireland - cost-effective EU region
 
 # Step 1: Build and test
 Write-Host "`n📦 Building solution..." -ForegroundColor Yellow

@@ -1,4 +1,4 @@
-using {
-  appName: 'tournament-app'
-  environment: 'dev'
-}
+using './main.bicep'
+
+param appName = 'suled-app'
+param environment = 'dev'

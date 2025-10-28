@@ -1,11 +1,11 @@
-// Main infrastructure file for Tournament Management System
+// Main infrastructure file for Suled Tournament Management System
 // Deploys Azure Functions, Storage Account, and Cosmos DB
 
 @description('The Azure region where resources will be deployed')
 param location string = resourceGroup().location
 
 @description('Name of the application')
-param appName string = 'tournament-${uniqueString(resourceGroup().id)}'
+param appName string = 'suled-${uniqueString(resourceGroup().id)}'
 
 @description('Environment name (dev, test, prod)')
 param environment string = 'dev'
