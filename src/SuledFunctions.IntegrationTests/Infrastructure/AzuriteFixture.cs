@@ -1,4 +1,5 @@
 using Azure.Storage.Blobs;
+using Docker.DotNet.Models;
 using Testcontainers.Azurite;
 
 namespace SuledFunctions.IntegrationTests.Infrastructure;
@@ -9,7 +10,17 @@ namespace SuledFunctions.IntegrationTests.Infrastructure;
 public class AzuriteFixture : IAsyncLifetime
 {
     private readonly AzuriteContainer _azuriteContainer = new AzuriteBuilder()
-        .WithImage("mcr.microsoft.com/azure-storage/azurite:latest")
+        .WithImage("mcr.microsoft.com/azure-storage/azurite:3.34.0")
+        .WithCreateParameterModifier(parameters =>
+        {
+            // Add --skipApiVersionCheck to the command arguments
+            if (parameters.Cmd != null)
+            {
+                var cmdList = parameters.Cmd.ToList();
+                cmdList.Add("--skipApiVersionCheck");
+                parameters.Cmd = cmdList;
+            }
+        })
         .Build();
 
     public string ConnectionString => _azuriteContainer.GetConnectionString();
