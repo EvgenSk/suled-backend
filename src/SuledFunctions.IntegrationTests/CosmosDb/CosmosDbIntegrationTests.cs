@@ -10,17 +10,27 @@ namespace SuledFunctions.IntegrationTests.CosmosDb;
 /// Tests CRUD operations and queries with real Cosmos DB container
 /// </summary>
 [Collection("CosmosDb")]
-public class CosmosDbIntegrationTests
+public class CosmosDbIntegrationTests : IAsyncLifetime
 {
     private readonly CosmosDbFixture _fixture;
-    private readonly Container _container;
+    private Container _container = null!;
     private const string DatabaseId = "SuledTestDb";
     private const string ContainerId = "tournaments";
 
     public CosmosDbIntegrationTests(CosmosDbFixture fixture)
     {
         _fixture = fixture;
-        _container = _fixture.CreateContainerAsync(DatabaseId, ContainerId, "/id").GetAwaiter().GetResult();
+    }
+
+    public async Task InitializeAsync()
+    {
+        _container = await _fixture.CreateContainerAsync(DatabaseId, ContainerId, "/id");
+    }
+
+    public Task DisposeAsync()
+    {
+        // Cleanup is handled by the fixture
+        return Task.CompletedTask;
     }
 
     [Fact]

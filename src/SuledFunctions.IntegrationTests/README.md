@@ -8,6 +8,10 @@ This project contains integration tests for the Suled backend Azure Functions. T
 - .NET 8.0 SDK or later
 - Windows with WSL2 enabled (for Docker on Windows)
 
+**⚠️ Known Limitations:**
+- **Cosmos DB Emulator**: The Linux Cosmos DB emulator has significant startup delays (2+ minutes) and may hang during initialization. Tests are functional but extremely slow. For faster integration testing, consider using a real Azure Cosmos DB instance or mocking Cosmos DB operations.
+- **Blob Storage Tests**: Fast and reliable (~9 seconds for all 6 tests)
+
 ## Test Structure
 
 ```

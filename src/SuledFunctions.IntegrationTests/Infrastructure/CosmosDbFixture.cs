@@ -26,10 +26,28 @@ public class CosmosDbFixture : IAsyncLifetime
             {
                 ServerCertificateCustomValidationCallback = (_, _, _, _) => true
             }),
-            ConnectionMode = ConnectionMode.Gateway
+            ConnectionMode = ConnectionMode.Gateway,
+            RequestTimeout = TimeSpan.FromSeconds(30)
         };
         
         CosmosClient = new CosmosClient(ConnectionString, clientOptions);
+        
+        // Wait for Cosmos DB to be fully ready by attempting to list databases
+        var maxRetries = 30;
+        for (int i = 0; i < maxRetries; i++)
+        {
+            try
+            {
+                using var iterator = CosmosClient.GetDatabaseQueryIterator<DatabaseProperties>();
+                await iterator.ReadNextAsync();
+                break; // Success
+            }
+            catch
+            {
+                if (i == maxRetries - 1) throw;
+                await Task.Delay(1000);
+            }
+        }
     }
 
     public async Task DisposeAsync()
