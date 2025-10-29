@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using SuledFunctions.Services;
 using OfficeOpenXml;
+using Microsoft.Azure.Cosmos;
 
 var builder = FunctionsApplication.CreateBuilder(args);
 
@@ -12,6 +13,17 @@ var builder = FunctionsApplication.CreateBuilder(args);
 ExcelPackage.License.SetNonCommercialPersonal("EvgenSk"); // TODO: do it in some proper way
 
 builder.ConfigureFunctionsWebApplication();
+
+// Register CosmosClient
+builder.Services.AddSingleton<CosmosClient>(sp =>
+{
+    var connectionString = Environment.GetEnvironmentVariable("CosmosDbConnection");
+    if (string.IsNullOrEmpty(connectionString))
+    {
+        throw new InvalidOperationException("CosmosDbConnection setting is required");
+    }
+    return new CosmosClient(connectionString);
+});
 
 // Register application services
 builder.Services.AddScoped<IExcelParserService, ExcelParserService>();

@@ -29,7 +29,6 @@ public class ProcessTournamentBlobFunction
         CreateIfNotExists = true)]
     public async Task<Tournament> Run(
         [BlobTrigger("tournaments/{name}", 
-            Source = BlobTriggerSource.EventGrid,
             Connection = "AzureWebJobsStorage")] 
         Stream blobStream,
         string name)

@@ -3,6 +3,7 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using System.Net;
 using SuledFunctions.Services;
+using Microsoft.Azure.Cosmos;
 
 namespace SuledFunctions.Functions;
 
@@ -23,14 +24,14 @@ public class UploadTournamentFunction
     }
 
     [Function("UploadTournament")]
-    [CosmosDBOutput(
-        databaseName: "%CosmosDbName%",
-        containerName: "%CosmosContainerName%",
-        Connection = "CosmosDbConnection",
-        CreateIfNotExists = true)]
-    public async Task<object> Run(
+    public async Task<HttpResponseData> Run(
         [HttpTrigger(AuthorizationLevel.Function, "post", Route = "tournament/upload")] 
-        HttpRequestData req)
+        HttpRequestData req,
+        [CosmosDBInput(
+            databaseName: "%CosmosDbName%",
+            containerName: "%CosmosContainerName%",
+            Connection = "CosmosDbConnection")] 
+        CosmosClient cosmosClient)
     {
         _logger.LogInformation("Processing tournament upload request");
 
@@ -70,6 +71,14 @@ public class UploadTournamentFunction
             // Parse the tournament
             var tournament = await _excelParser.ParseTournamentAsync(memoryStream, fileName);
 
+            // Save to Cosmos DB
+            var database = cosmosClient.GetDatabase(Environment.GetEnvironmentVariable("CosmosDbName"));
+            var container = database.GetContainer(Environment.GetEnvironmentVariable("CosmosContainerName"));
+            await container.CreateItemAsync(tournament, new PartitionKey(tournament.Id));
+
+            _logger.LogInformation("Tournament {TournamentId} saved to Cosmos DB with {GameCount} games",
+                tournament.Id, tournament.Games.Count);
+
             // Create success response
             var response = req.CreateResponse(HttpStatusCode.Created);
             await response.WriteAsJsonAsync(new
@@ -80,12 +89,7 @@ public class UploadTournamentFunction
                 message = "Tournament uploaded successfully"
             });
 
-            // Return both response and tournament for Cosmos DB output binding
-            return new
-            {
-                HttpResponse = response,
-                Document = tournament
-            };
+            return response;
         }
         catch (Exception ex)
         {
