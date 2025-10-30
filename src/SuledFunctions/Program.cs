@@ -22,7 +22,16 @@ builder.Services.AddSingleton<CosmosClient>(sp =>
     {
         throw new InvalidOperationException("CosmosDbConnection setting is required");
     }
-    return new CosmosClient(connectionString);
+    
+    var options = new CosmosClientOptions
+    {
+        SerializerOptions = new CosmosSerializationOptions
+        {
+            PropertyNamingPolicy = CosmosPropertyNamingPolicy.CamelCase
+        }
+    };
+    
+    return new CosmosClient(connectionString, options);
 });
 
 // Register application services

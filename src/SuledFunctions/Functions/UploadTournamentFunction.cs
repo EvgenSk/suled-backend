@@ -37,37 +37,42 @@ public class UploadTournamentFunction
 
         try
         {
-            // Check if request contains multipart form data
-            if (!req.Headers.TryGetValues("Content-Type", out var contentTypeValues) ||
-                !contentTypeValues.Any(ct => ct.Contains("multipart/form-data", StringComparison.OrdinalIgnoreCase)))
+            _logger.LogInformation("Request received");
+            
+            using var memoryStream = new MemoryStream();
+            
+            _logger.LogInformation("Reading file from request body");
+            
+            // Set a timeout for reading
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            try
             {
+                await req.Body.CopyToAsync(memoryStream, cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogError("Timeout reading request body");
+                var timeoutResponse = req.CreateResponse(HttpStatusCode.RequestTimeout);
+                await timeoutResponse.WriteAsJsonAsync(new { error = "Request timeout while reading file" });
+                return timeoutResponse;
+            }
+            
+            _logger.LogInformation("Received {ByteCount} bytes", memoryStream.Length);
+            
+            if (memoryStream.Length == 0)
+            {
+                _logger.LogWarning("Empty request body");
                 var errorResponse = req.CreateResponse(HttpStatusCode.BadRequest);
-                await errorResponse.WriteAsJsonAsync(new { error = "Request must be multipart/form-data" });
+                await errorResponse.WriteAsJsonAsync(new { error = "No file data received" });
                 return errorResponse;
             }
-
-            // Read the file from the request
-            using var memoryStream = new MemoryStream();
-            await req.Body.CopyToAsync(memoryStream);
+            
             memoryStream.Position = 0;
 
-            // Parse the file name from content disposition header
             var fileName = "tournament.xlsx";
-            if (req.Headers.TryGetValues("Content-Disposition", out var dispositionValues))
-            {
-                var disposition = dispositionValues.FirstOrDefault();
-                if (!string.IsNullOrEmpty(disposition))
-                {
-                    var fileNameMatch = System.Text.RegularExpressions.Regex.Match(
-                        disposition, 
-                        @"filename=""?([^""]+)""?");
-                    if (fileNameMatch.Success)
-                    {
-                        fileName = fileNameMatch.Groups[1].Value;
-                    }
-                }
-            }
 
+            _logger.LogInformation("Parsing tournament from file");
+            
             // Parse the tournament
             var tournament = await _excelParser.ParseTournamentAsync(memoryStream, fileName);
 
