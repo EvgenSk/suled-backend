@@ -37,6 +37,24 @@ public class UploadTournamentFunction
 
         try
         {
+            // Validate Content-Type header
+            if (!req.Headers.TryGetValues("Content-Type", out var contentTypeValues))
+            {
+                _logger.LogWarning("Missing Content-Type header");
+                var errorResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await errorResponse.WriteAsJsonAsync(new { error = "Content-Type header is required" });
+                return errorResponse;
+            }
+
+            var contentType = contentTypeValues.FirstOrDefault();
+            if (string.IsNullOrEmpty(contentType) || !contentType.Contains("multipart/form-data", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning("Invalid Content-Type: {ContentType}", contentType);
+                var errorResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await errorResponse.WriteAsJsonAsync(new { error = "Content-Type must be multipart/form-data" });
+                return errorResponse;
+            }
+
             _logger.LogInformation("Request received");
             
             using var memoryStream = new MemoryStream();
@@ -69,7 +87,22 @@ public class UploadTournamentFunction
             
             memoryStream.Position = 0;
 
+            // Extract filename from Content-Disposition header if present
             var fileName = "tournament.xlsx";
+            if (req.Headers.TryGetValues("Content-Disposition", out var dispositionValues))
+            {
+                var contentDisposition = dispositionValues.FirstOrDefault();
+                if (!string.IsNullOrEmpty(contentDisposition))
+                {
+                    // Extract filename from Content-Disposition header (e.g., "attachment; filename="my-file.xlsx"")
+                    var fileNameMatch = System.Text.RegularExpressions.Regex.Match(contentDisposition, @"filename=""?([^""]+)""?");
+                    if (fileNameMatch.Success)
+                    {
+                        fileName = fileNameMatch.Groups[1].Value;
+                        _logger.LogInformation("Extracted filename from Content-Disposition: {FileName}", fileName);
+                    }
+                }
+            }
 
             _logger.LogInformation("Parsing tournament from file");
             
