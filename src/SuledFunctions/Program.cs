@@ -38,6 +38,7 @@ builder.Services.AddSingleton<CosmosClient>(sp =>
 builder.Services.AddScoped<IExcelParserService, ExcelParserService>();
 builder.Services.AddScoped<IPairService, PairService>();
 builder.Services.AddScoped<IGameService, GameService>();
+builder.Services.AddScoped<ITournamentService, TournamentService>();
 
 builder.Services
     .AddApplicationInsightsTelemetryWorkerService()

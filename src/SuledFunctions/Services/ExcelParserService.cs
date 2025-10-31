@@ -38,8 +38,17 @@ public class ExcelParserService : IExcelParserService
                 throw new InvalidOperationException("No worksheet found in Excel file");
             }
 
+            // Extract metadata from filename
+            ExtractMetadataFromFileName(tournament, fileName);
+            
+            // Try to extract metadata from Excel (optional)
+            ExtractMetadataFromExcel(tournament, worksheet);
+
             var games = ParseGames(worksheet, tournament.Id);
             tournament.Games = games;
+            
+            // Auto-determine tournament status based on dates
+            DetermineStatus(tournament);
 
             _logger.LogInformation("Parsed {GameCount} games from tournament {TournamentName}", 
                 games.Count, tournament.Name);
@@ -50,6 +59,134 @@ public class ExcelParserService : IExcelParserService
         {
             _logger.LogError(ex, "Error parsing Excel file {FileName}", fileName);
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Extract metadata from filename pattern: tournament_2025-11-15_Chicago_DivisionA.xlsx
+    /// </summary>
+    private void ExtractMetadataFromFileName(Tournament tournament, string fileName)
+    {
+        try
+        {
+            var nameWithoutExt = Path.GetFileNameWithoutExtension(fileName);
+            var parts = nameWithoutExt.Split('_', StringSplitOptions.RemoveEmptyEntries);
+            
+            // Expected format: name_date_location_division
+            // e.g., "SummerChampionship_2025-11-15_Chicago_DivisionA"
+            if (parts.Length >= 2)
+            {
+                // First part is tournament name
+                tournament.Name = parts[0];
+                
+                // Try to parse date from second part
+                if (DateTime.TryParse(parts[1], out var startDate))
+                {
+                    tournament.StartDate = startDate;
+                }
+                
+                // Third part is location (if exists)
+                if (parts.Length >= 3)
+                {
+                    tournament.Location = parts[2];
+                }
+                
+                // Fourth part is division (if exists)
+                if (parts.Length >= 4)
+                {
+                    tournament.Division = parts[3];
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not extract metadata from filename {FileName}", fileName);
+        }
+    }
+    
+    /// <summary>
+    /// Try to extract metadata from Excel cells (e.g., first few rows before game data)
+    /// Expected format (optional):
+    /// Row 1: Tournament Name: [value]
+    /// Row 2: Location: [value]
+    /// Row 3: Date: [value]
+    /// Row 4: Division: [value]
+    /// </summary>
+    private void ExtractMetadataFromExcel(Tournament tournament, ExcelWorksheet worksheet)
+    {
+        try
+        {
+            // Look for metadata in first few rows
+            for (int row = 1; row <= Math.Min(5, worksheet.Dimension.End.Row); row++)
+            {
+                var labelCell = worksheet.Cells[row, 1].Text.Trim();
+                var valueCell = worksheet.Cells[row, 2].Text.Trim();
+                
+                if (string.IsNullOrWhiteSpace(labelCell)) continue;
+                
+                // Check for common metadata labels
+                if (labelCell.Contains("Tournament", StringComparison.OrdinalIgnoreCase) ||
+                    labelCell.Contains("Name", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!string.IsNullOrWhiteSpace(valueCell))
+                        tournament.Name = valueCell;
+                }
+                else if (labelCell.Contains("Location", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!string.IsNullOrWhiteSpace(valueCell))
+                        tournament.Location = valueCell;
+                }
+                else if (labelCell.Contains("Date", StringComparison.OrdinalIgnoreCase) ||
+                         labelCell.Contains("Start", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (DateTime.TryParse(valueCell, out var date))
+                        tournament.StartDate = date;
+                }
+                else if (labelCell.Contains("Division", StringComparison.OrdinalIgnoreCase) ||
+                         labelCell.Contains("Category", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!string.IsNullOrWhiteSpace(valueCell))
+                        tournament.Division = valueCell;
+                }
+                else if (labelCell.Contains("Description", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!string.IsNullOrWhiteSpace(valueCell))
+                        tournament.Description = valueCell;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not extract metadata from Excel content");
+        }
+    }
+    
+    /// <summary>
+    /// Determine tournament status based on dates
+    /// </summary>
+    private void DetermineStatus(Tournament tournament)
+    {
+        if (!tournament.StartDate.HasValue)
+        {
+            tournament.Status = TournamentStatus.Upcoming;
+            return;
+        }
+        
+        var now = DateTime.UtcNow;
+        var startDate = tournament.StartDate.Value;
+        var endDate = tournament.EndDate ?? startDate;
+        
+        if (now < startDate)
+        {
+            tournament.Status = TournamentStatus.Upcoming;
+        }
+        else if (now > endDate)
+        {
+            tournament.Status = TournamentStatus.Completed;
+        }
+        else
+        {
+            tournament.Status = TournamentStatus.InProgress;
         }
     }
 
