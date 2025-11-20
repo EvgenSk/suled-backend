@@ -80,7 +80,7 @@ jobs:
       with:
         app-name: suled-app-func
         package: ./publish
-        publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
+        publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE_DEV }}
         scm-do-build-during-deployment: false
         enable-oryx-build: false
 
