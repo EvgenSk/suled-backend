@@ -72,14 +72,15 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: azure-functions
+        path: ./publish
 
     - name: Deploy to Azure Functions (Dev)
       id: deploy-to-function
       uses: Azure/functions-action@v1
       with:
         app-name: suled-app-func
-        package: '.'
-        publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE_DEV }}
+        package: ./publish
+        publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
         scm-do-build-during-deployment: false
         enable-oryx-build: false
 
@@ -96,13 +97,14 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: azure-functions
+        path: ./publish
 
     - name: Deploy to Azure Functions (Prod)
       id: deploy-to-function
       uses: Azure/functions-action@v1
       with:
-        app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
-        package: '.'
+        app-name: suled-app-func
+        package: ./publish
         publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
         scm-do-build-during-deployment: false
         enable-oryx-build: false
