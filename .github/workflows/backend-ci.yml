@@ -12,6 +12,7 @@ on:
     paths:
       - 'src/**'
       - 'infra/**'
+  workflow_dispatch:
 
 env:
   DOTNET_VERSION: '8.0.x'
