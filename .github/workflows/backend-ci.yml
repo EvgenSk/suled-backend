@@ -57,7 +57,9 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: azure-functions
-        path: ./publish
+        path: |
+          ./publish/**
+          ./publish/.azurefunctions/**
 
   deploy-dev:
     runs-on: ubuntu-latest
