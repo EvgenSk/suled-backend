@@ -52,14 +52,20 @@ jobs:
     - name: Publish Azure Functions
       run: dotnet publish ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }} --configuration Release --output ./publish
 
+    - name: Verify .azurefunctions directory
+      run: |
+        ls -la ./publish
+        if [ ! -d "./publish/.azurefunctions" ]; then
+          echo "ERROR: .azurefunctions directory not found in publish output"
+          exit 1
+        fi
+
     - name: Upload artifact for deployment
       if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
       uses: actions/upload-artifact@v4
       with:
         name: azure-functions
-        path: |
-          ./publish/**
-          ./publish/.azurefunctions/**
+        path: ./publish
 
   deploy-dev:
     runs-on: ubuntu-latest
