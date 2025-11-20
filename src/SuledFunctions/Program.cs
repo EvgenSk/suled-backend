@@ -5,6 +5,8 @@ using Microsoft.Extensions.Hosting;
 using SuledFunctions.Services;
 using OfficeOpenXml;
 using Microsoft.Azure.Cosmos;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 var builder = FunctionsApplication.CreateBuilder(args);
 
@@ -13,6 +15,13 @@ var builder = FunctionsApplication.CreateBuilder(args);
 ExcelPackage.License.SetNonCommercialPersonal("EvgenSk"); // TODO: do it in some proper way
 
 builder.ConfigureFunctionsWebApplication();
+
+// Configure JSON serialization to use camelCase for web API consistency
+builder.Services.Configure<JsonSerializerOptions>(options =>
+{
+    options.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+    options.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+});
 
 // Register CosmosClient
 builder.Services.AddSingleton<CosmosClient>(sp =>

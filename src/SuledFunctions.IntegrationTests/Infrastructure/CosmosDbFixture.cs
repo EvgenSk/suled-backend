@@ -33,7 +33,9 @@ public class CosmosDbFixture : IAsyncLifetime
         CosmosClient = new CosmosClient(ConnectionString, clientOptions);
         
         // Wait for Cosmos DB to be fully ready by attempting to list databases
-        var maxRetries = 30;
+        // CosmosDB emulator can take 60-120 seconds to fully initialize
+        var maxRetries = 60;
+        var retryDelay = 2000; // 2 seconds
         for (int i = 0; i < maxRetries; i++)
         {
             try
@@ -42,10 +44,15 @@ public class CosmosDbFixture : IAsyncLifetime
                 await iterator.ReadNextAsync();
                 break; // Success
             }
-            catch
+            catch (Exception ex)
             {
-                if (i == maxRetries - 1) throw;
-                await Task.Delay(1000);
+                if (i == maxRetries - 1)
+                {
+                    throw new TimeoutException(
+                        $"CosmosDB emulator failed to become ready after {maxRetries * retryDelay / 1000} seconds. " +
+                        $"Last error: {ex.Message}", ex);
+                }
+                await Task.Delay(retryDelay);
             }
         }
     }

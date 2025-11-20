@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Suled.Contracts.DTOs;
 
 /// <summary>
@@ -5,8 +7,15 @@ namespace Suled.Contracts.DTOs;
 /// </summary>
 public class PairDto
 {
+    [JsonPropertyName("id")]
     public string Id { get; set; } = string.Empty;
+    
+    [JsonPropertyName("displayName")]
     public string DisplayName { get; set; } = string.Empty;
+    
+    [JsonPropertyName("player1")]
     public string Player1 { get; set; } = string.Empty;
+    
+    [JsonPropertyName("player2")]
     public string Player2 { get; set; } = string.Empty;
 }

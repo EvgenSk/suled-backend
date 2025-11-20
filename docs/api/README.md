@@ -11,6 +11,91 @@ Currently, the API does not require authentication. This will be added in a futu
 
 ## Endpoints
 
+---
+
+### Get Tournaments
+
+Retrieves a list of tournaments with optional filtering.
+
+**Endpoint**: `GET /tournaments`
+
+**Query Parameters**:
+- `startDateFrom` (optional): Filter tournaments starting from this date (ISO 8601 format)
+- `startDateTo` (optional): Filter tournaments starting before this date (ISO 8601 format)
+- `location` (optional): Filter by location (case-insensitive partial match)
+- `division` (optional): Filter by division (case-insensitive partial match)
+- `status` (optional): Filter by status (`Upcoming`, `InProgress`, `Completed`, `Cancelled`)
+- `maxResults` (optional): Maximum number of results to return (default: 100, max: 500)
+
+**Request Examples**:
+```bash
+# Get all upcoming tournaments
+curl "https://suled-functions.azurewebsites.net/api/tournaments?status=Upcoming"
+
+# Get tournaments in November 2025
+curl "https://suled-functions.azurewebsites.net/api/tournaments?startDateFrom=2025-11-01&startDateTo=2025-11-30"
+
+# Get tournaments in Chicago, Division A
+curl "https://suled-functions.azurewebsites.net/api/tournaments?location=Chicago&division=DivisionA"
+```
+
+**Response**: `200 OK`
+
+```json
+[
+  {
+    "id": "tournament-123",
+    "name": "Summer Championship",
+    "startDate": "2025-11-15T09:00:00Z",
+    "endDate": "2025-11-15T18:00:00Z",
+    "location": "Chicago",
+    "division": "Division A",
+    "description": "Annual summer championship tournament",
+    "status": "Upcoming",
+    "gameCount": 24,
+    "createdDate": "2025-10-31T10:00:00Z"
+  },
+  {
+    "id": "tournament-456",
+    "name": "Winter Cup",
+    "startDate": "2025-12-01T09:00:00Z",
+    "endDate": "2025-12-01T17:00:00Z",
+    "location": "New York",
+    "division": "Division B",
+    "description": "",
+    "status": "Upcoming",
+    "gameCount": 18,
+    "createdDate": "2025-10-30T14:00:00Z"
+  }
+]
+```
+
+**Response Schema**: Array of `TournamentListDto`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| id | string | Unique tournament identifier |
+| name | string | Tournament name |
+| startDate | DateTime? | Tournament start date |
+| endDate | DateTime? | Tournament end date |
+| location | string | Tournament location |
+| division | string | Tournament division/category |
+| description | string | Tournament description |
+| status | string | Status (Upcoming, InProgress, Completed, Cancelled) |
+| gameCount | int | Number of games in tournament |
+| createdDate | DateTime | When tournament was uploaded |
+
+**Error Responses**:
+
+- `400 Bad Request`: Invalid query parameters
+  ```json
+  {
+    "error": "Invalid date format for startDateFrom parameter"
+  }
+  ```
+
+---
+
 ### Get All Pairs
 
 Retrieves all tournament pairs.
@@ -112,28 +197,46 @@ Retrieves all games for a specific pair.
 
 Uploads an Excel file containing tournament data.
 
-**Endpoint**: `POST /v1/tournaments/upload`
+**Endpoint**: `POST /tournament/upload`
 
-**Content-Type**: `multipart/form-data`
+**Content-Type**: `application/octet-stream` or `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
 
-**Parameters**:
-- `file` (form-data, required): Excel file (.xlsx) containing tournament data
-- `tournamentId` (form-data, optional): Tournament identifier (generated if not provided)
+**Filename Format** (Optional but Recommended):
+To include metadata, use this filename pattern:
+```
+TournamentName_YYYY-MM-DD_Location_Division.xlsx
+```
+
+Examples:
+- `SummerChampionship_2025-11-15_Chicago_DivisionA.xlsx`
+- `WinterCup_2025-12-01_NewYork_DivisionB.xlsx`
+
+**Metadata in Excel** (Optional):
+You can also include metadata in the first few rows of the Excel file:
+```
+Row 1: Tournament Name: | Summer Championship
+Row 2: Location:        | Chicago
+Row 3: Date:            | 2025-11-15
+Row 4: Division:        | Division A
+Row 5: Description:     | Annual summer championship
+```
 
 **Request Example**:
 ```bash
-curl -X POST https://suled-functions.azurewebsites.net/api/v1/tournaments/upload \
-  -F "file=@tournament.xlsx" \
-  -F "tournamentId=tournament-2025"
+# Upload with metadata in filename
+curl -X POST https://suled-functions.azurewebsites.net/api/tournament/upload \
+  -H "Content-Type: application/octet-stream" \
+  --data-binary "@SummerChampionship_2025-11-15_Chicago_DivisionA.xlsx"
 ```
 
-**Response**: `202 Accepted`
+**Response**: `201 Created`
 
 ```json
 {
-  "message": "Tournament upload initiated",
-  "tournamentId": "tournament-2025",
-  "blobUrl": "https://storage.blob.core.windows.net/tournaments/tournament-2025.xlsx"
+  "id": "tournament-123",
+  "name": "SummerChampionship",
+  "gameCount": 24,
+  "message": "Tournament uploaded successfully"
 }
 ```
 
@@ -141,29 +244,48 @@ curl -X POST https://suled-functions.azurewebsites.net/api/v1/tournaments/upload
 
 | Field | Type | Description |
 |-------|------|-------------|
-| message | string | Status message |
-| tournamentId | string | Tournament identifier |
-| blobUrl | string | Azure Blob Storage URL |
+| id | string | Generated tournament identifier |
+| name | string | Tournament name |
+| gameCount | int | Number of games parsed |
+| message | string | Success message |
 
 **Error Responses**:
 
-- `400 Bad Request`: Invalid file format
+- `400 Bad Request`: Invalid file format or empty file
   ```json
   {
-    "error": "Invalid file format. Please upload an Excel file (.xlsx)"
+    "error": "No file data received"
   }
   ```
 
-- `413 Payload Too Large`: File size exceeds limit (10MB)
+- `408 Request Timeout`: File upload timeout
   ```json
   {
-    "error": "File size exceeds maximum limit of 10MB"
+    "error": "Request timeout while reading file"
   }
   ```
 
 ---
 
 ## Data Models
+
+### TournamentListDto
+
+```csharp
+public class TournamentListDto
+{
+    public string Id { get; init; } = string.Empty;
+    public string Name { get; init; } = string.Empty;
+    public DateTime? StartDate { get; init; }
+    public DateTime? EndDate { get; init; }
+    public string Location { get; init; } = string.Empty;
+    public string Division { get; init; } = string.Empty;
+    public string Description { get; init; } = string.Empty;
+    public string Status { get; init; } = string.Empty;
+    public int GameCount { get; init; }
+    public DateTime CreatedDate { get; init; }
+}
+```
 
 ### PairDto
 
