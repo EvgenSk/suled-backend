@@ -52,20 +52,19 @@ jobs:
     - name: Publish Azure Functions
       run: dotnet publish ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }} --configuration Release --output ./publish
 
-    - name: Verify .azurefunctions directory
+    - name: Create deployment package
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
       run: |
-        ls -la ./publish
-        if [ ! -d "./publish/.azurefunctions" ]; then
-          echo "ERROR: .azurefunctions directory not found in publish output"
-          exit 1
-        fi
+        cd ./publish
+        zip -r ../functions-package.zip .
+        cd ..
 
     - name: Upload artifact for deployment
       if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
       uses: actions/upload-artifact@v4
       with:
         name: azure-functions
-        path: ./publish
+        path: functions-package.zip
 
   deploy-dev:
     runs-on: ubuntu-latest
@@ -80,7 +79,11 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: azure-functions
-        path: ./publish
+
+    - name: Extract deployment package
+      run: |
+        unzip -q functions-package.zip -d ./publish
+        ls -la ./publish
 
     - name: Deploy to Azure Functions (Dev)
       id: deploy-to-function
@@ -105,7 +108,11 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: azure-functions
-        path: ./publish
+
+    - name: Extract deployment package
+      run: |
+        unzip -q functions-package.zip -d ./publish
+        ls -la ./publish
 
     - name: Deploy to Azure Functions (Prod)
       id: deploy-to-function
