@@ -23,7 +23,7 @@ public class GetGamesForPairFunction
 
     [Function("GetGamesForPair")]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "games/pair/{pairId}")] 
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "games/pair/{pairId}")] 
         HttpRequestData req,
         string pairId,
         [CosmosDBInput(

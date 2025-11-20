@@ -25,7 +25,7 @@ public class UploadTournamentFunction
 
     [Function("UploadTournament")]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "tournament/upload")] 
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "tournament/upload")] 
         HttpRequestData req,
         [CosmosDBInput(
             databaseName: "%CosmosDbName%",

@@ -26,7 +26,7 @@ public class GetTournamentsFunction
 
     [Function("GetTournaments")]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "tournaments")] 
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "tournaments")] 
         HttpRequestData req)
     {
         _logger.LogInformation("Processing get tournaments request");

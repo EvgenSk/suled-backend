@@ -23,7 +23,7 @@ public class GetPairsFunction
 
     [Function("GetPairs")]
     public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "pairs")] 
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "pairs")] 
         HttpRequestData req,
         [CosmosDBInput(
             databaseName: "%CosmosDbName%",
