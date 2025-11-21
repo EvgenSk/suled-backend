@@ -81,10 +81,26 @@ public class GetPairsFunctionTests
         {
             Id = "test-1",
             Name = "Test Tournament",
-            Games = new List<Game>
+            Pairs = new List<TournamentPair>
             {
-                new Game { Id = "g1", Pair1 = pair1, Pair2 = pair2, Round = 1, CourtNumber = 1 },
-                new Game { Id = "g2", Pair1 = pair1, Pair2 = pair2, Round = 2, CourtNumber = 1 } // Same pairs
+                new TournamentPair
+                {
+                    PairInfo = pair1,
+                    Games = new List<PairGame>
+                    {
+                        new PairGame { Id = "g1", OpponentPair = pair2, Round = 1, CourtNumber = 1 },
+                        new PairGame { Id = "g2", OpponentPair = pair2, Round = 2, CourtNumber = 1 }
+                    }
+                },
+                new TournamentPair
+                {
+                    PairInfo = pair2,
+                    Games = new List<PairGame>
+                    {
+                        new PairGame { Id = "g1", OpponentPair = pair1, Round = 1, CourtNumber = 1 },
+                        new PairGame { Id = "g2", OpponentPair = pair1, Round = 2, CourtNumber = 1 }
+                    }
+                }
             }
         };
 
@@ -271,10 +287,40 @@ public class GetPairsFunctionTests
         {
             Id = id,
             Name = $"Tournament {id}",
-            Games = new List<Game>
+            Pairs = new List<TournamentPair>
             {
-                new Game { Id = $"g{roundOffset}-1", Pair1 = pair1, Pair2 = pair2, Round = roundOffset, CourtNumber = 1 },
-                new Game { Id = $"g{roundOffset}-2", Pair1 = pair3, Pair2 = pair4, Round = roundOffset, CourtNumber = 2 }
+                new TournamentPair
+                {
+                    PairInfo = pair1,
+                    Games = new List<PairGame>
+                    {
+                        new PairGame { Id = $"g{roundOffset}-1", OpponentPair = pair2, Round = roundOffset, CourtNumber = 1 }
+                    }
+                },
+                new TournamentPair
+                {
+                    PairInfo = pair2,
+                    Games = new List<PairGame>
+                    {
+                        new PairGame { Id = $"g{roundOffset}-1", OpponentPair = pair1, Round = roundOffset, CourtNumber = 1 }
+                    }
+                },
+                new TournamentPair
+                {
+                    PairInfo = pair3,
+                    Games = new List<PairGame>
+                    {
+                        new PairGame { Id = $"g{roundOffset}-2", OpponentPair = pair4, Round = roundOffset, CourtNumber = 2 }
+                    }
+                },
+                new TournamentPair
+                {
+                    PairInfo = pair4,
+                    Games = new List<PairGame>
+                    {
+                        new PairGame { Id = $"g{roundOffset}-2", OpponentPair = pair3, Round = roundOffset, CourtNumber = 2 }
+                    }
+                }
             }
         };
     }

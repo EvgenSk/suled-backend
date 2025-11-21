@@ -29,21 +29,35 @@ public class GetPairsFunction
             databaseName: "%CosmosDbName%",
             containerName: "%CosmosContainerName%",
             Connection = "CosmosDbConnection",
-            SqlQuery = "SELECT * FROM c WHERE c.Games != null")]
+            SqlQuery = "SELECT * FROM c WHERE c.Pairs != null")]
         IEnumerable<Tournament> tournaments)
     {
-        _logger.LogInformation("Getting all pairs");
+        _logger.LogInformation("Getting all pairs from all tournaments");
 
         try
         {
-            // Use service to extract unique pairs
-            var pairs = _pairService.GetUniquePairs(tournaments);
+            // Extract all pairs from all tournaments (pair-centered structure)
+            var allPairs = tournaments
+                .Where(t => t.Pairs != null)
+                .SelectMany(t => t.Pairs)
+                .GroupBy(p => p.Id)
+                .Select(g => g.First()) // Take first instance of each unique pair
+                .OrderBy(p => p.DisplayName)
+                .Select(p => new
+                {
+                    id = p.Id,
+                    displayName = p.DisplayName,
+                    player1 = p.PairInfo.Player1.FullName,
+                    player2 = p.PairInfo.Player2.FullName,
+                    gameCount = p.GameCount
+                })
+                .ToList();
 
             var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(new
             {
-                pairs,
-                totalPairs = pairs.Count()
+                pairs = allPairs,
+                totalPairs = allPairs.Count
             });
 
             return response;

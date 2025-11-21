@@ -18,11 +18,11 @@ public class PairServiceTests
     public void GetUniquePairs_WithValidTournaments_ReturnsAllUniquePairs()
     {
         // Arrange
+        var pair1 = CreatePair("John", "Doe", "Jane", "Smith");
+        var pair2 = CreatePair("Bob", "Johnson", "Alice", "Brown");
         var tournaments = new[]
         {
-            CreateTournament("t1", 
-                CreatePair("p1", "John", "Doe", "Jane", "Smith"),
-                CreatePair("p2", "Bob", "Johnson", "Alice", "Brown"))
+            CreateTournament("t1", pair1, pair2)
         };
 
         // Act
@@ -30,16 +30,16 @@ public class PairServiceTests
 
         // Assert
         result.Should().HaveCount(2);
-        result.Should().Contain(p => p.Id == "p1");
-        result.Should().Contain(p => p.Id == "p2");
+        result.Should().Contain(p => p.Id == pair1.Id);
+        result.Should().Contain(p => p.Id == pair2.Id);
     }
 
     [Fact]
-    public void GetUniquePairs_WithDuplicatePairs_ReturnsUniqueList()
+    public void GetUniquePairs_WithDuplicatePairs_ReturnsUniqueListWithGameCount()
     {
         // Arrange
-        var pair1 = CreatePair("p1", "John", "Doe", "Jane", "Smith");
-        var pair2 = CreatePair("p2", "Bob", "Johnson", "Alice", "Brown");
+        var pair1 = CreatePair("John", "Doe", "Jane", "Smith");
+        var pair2 = CreatePair("Bob", "Johnson", "Alice", "Brown");
         
         var tournaments = new[]
         {
@@ -52,7 +52,9 @@ public class PairServiceTests
 
         // Assert
         result.Should().HaveCount(2, "duplicate pairs should be filtered out");
-        result.Select(p => p.Id).Should().BeEquivalentTo(new[] { "p1", "p2" });
+        result.Select(p => p.Id).Should().BeEquivalentTo(new[] { pair1.Id, pair2.Id });
+        // Each pair appears in 2 games (once per tournament)
+        result.Should().OnlyContain(p => p.GameCount == 2);
     }
 
     [Fact]
@@ -62,9 +64,9 @@ public class PairServiceTests
         var tournaments = new[]
         {
             CreateTournament("t1",
-                CreatePair("p1", "Zara", "Last", "Zoe", "End"), // Should be last
-                CreatePair("p2", "Alice", "First", "Bob", "Second"), // Should be first
-                CreatePair("p3", "Mike", "Middle", "Mary", "Mid")) // Should be in middle
+                CreatePair("Zara", "Last", "Zoe", "End"), // Should be last
+                CreatePair("Alice", "First", "Bob", "Second"), // Should be first
+                CreatePair("Mike", "Middle", "Mary", "Mid")) // Should be in middle
         };
 
         // Act
@@ -81,8 +83,8 @@ public class PairServiceTests
     public void GetUniquePairs_IncludesRequiredFields()
     {
         // Arrange
-        var pair1 = CreatePair("p1", "Aaron", "Apple", "Alex", "Anderson");  // Will sort first alphabetically
-        var pair2 = CreatePair("p2", "Zack", "Zebra", "Zara", "Zoo");
+        var pair1 = CreatePair("Aaron", "Apple", "Alex", "Anderson");  // Will sort first alphabetically
+        var pair2 = CreatePair("Zack", "Zebra", "Zara", "Zoo");
         var tournaments = new[]
         {
             CreateTournament("t1", pair1, pair2)
@@ -92,19 +94,20 @@ public class PairServiceTests
         var result = _pairService.GetUniquePairs(tournaments).First();
 
         // Assert
-        result.Id.Should().Be("p1");
+        result.Id.Should().NotBeNullOrEmpty();
         result.DisplayName.Should().NotBeNullOrEmpty();
         result.Player1.Should().Be("Aaron Apple");
         result.Player2.Should().Be("Alex Anderson");
+        result.GameCount.Should().BeGreaterThan(0);
     }
 
     [Fact]
     public void GetUniquePairs_WithMultipleTournaments_CombinesPairs()
     {
         // Arrange
-        var p1 = CreatePair("p1", "John", "Doe", "Jane", "Smith");
-        var p2 = CreatePair("p2", "Bob", "Johnson", "Alice", "Brown");
-        var p3 = CreatePair("p3", "Tom", "Wilson", "Sue", "Davis");
+        var p1 = CreatePair("John", "Doe", "Jane", "Smith");
+        var p2 = CreatePair("Bob", "Johnson", "Alice", "Brown");
+        var p3 = CreatePair("Tom", "Wilson", "Sue", "Davis");
         var tournaments = new[]
         {
             CreateTournament("t1", p1, p2),
@@ -116,14 +119,18 @@ public class PairServiceTests
 
         // Assert
         result.Should().HaveCount(3);
-        result.Select(p => p.Id).Should().BeEquivalentTo(new[] { "p1", "p2", "p3" });
+        result.Select(p => p.Id).Should().BeEquivalentTo(new[] { p1.Id, p2.Id, p3.Id });
+        // p1 and p3 appear in 1 game each, p2 appears in 2 games
+        result.Single(p => p.Id == p1.Id).GameCount.Should().Be(1);
+        result.Single(p => p.Id == p2.Id).GameCount.Should().Be(2);
+        result.Single(p => p.Id == p3.Id).GameCount.Should().Be(1);
     }
 
     [Fact]
     public void GetUniquePairs_WithNullTournaments_ReturnsEmptyList()
     {
         // Act
-        var result = _pairService.GetUniquePairs(null);
+        var result = _pairService.GetUniquePairs(null!);
 
         // Assert
         result.Should().BeEmpty();
@@ -143,11 +150,11 @@ public class PairServiceTests
     public void GetUniquePairs_WithNullGames_HandlesGracefully()
     {
         // Arrange
-        var pair1 = CreatePair("p1", "John", "Doe", "Jane", "Smith");
-        var pair2 = CreatePair("p2", "Bob", "Builder", "Alice", "Wonder");
+        var pair1 = CreatePair("John", "Doe", "Jane", "Smith");
+        var pair2 = CreatePair("Bob", "Builder", "Alice", "Wonder");
         var tournaments = new[]
         {
-            new Tournament { Id = "t1", Name = "Test", Games = null },
+            new Tournament { Id = "t1", Name = "Test", Games = null! },
             CreateTournament("t2", pair1, pair2)
         };
 
@@ -156,7 +163,7 @@ public class PairServiceTests
 
         // Assert
         result.Should().HaveCount(2);
-        result.Select(p => p.Id).Should().Contain("p1");
+        result.Select(p => p.Id).Should().Contain(pair1.Id);
     }
 
     // Helper methods
@@ -184,7 +191,7 @@ public class PairServiceTests
         };
     }
 
-    private Pair CreatePair(string id, string player1FirstName, string player1LastName,
+    private Pair CreatePair(string player1FirstName, string player1LastName,
         string player2FirstName, string player2LastName)
     {
         var player1 = new Player
@@ -199,11 +206,15 @@ public class PairServiceTests
             Surname = player2LastName
         };
 
-        return new Pair
+        var pair = new Pair
         {
-            Id = id,
             Player1 = player1,
             Player2 = player2
         };
+        
+        // Access Id to trigger generation
+        _ = pair.Id;
+        
+        return pair;
     }
 }

@@ -22,6 +22,11 @@ public record Tournament
     public string Description { get; set; } = string.Empty;
     public TournamentStatus Status { get; set; } = TournamentStatus.Upcoming;
     
+    // Pair-centered: Tournament contains pairs, each with their games
+    public List<TournamentPair> Pairs { get; set; } = new();
+    
+    // DEPRECATED: Keep for backward compatibility during migration
+    [JsonIgnore]
     public List<Game> Games { get; set; } = new();
 }
 

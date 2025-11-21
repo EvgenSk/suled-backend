@@ -17,12 +17,12 @@ public class GameServiceTests
     public void GetGamesForPair_WithValidPairId_ReturnsMatchingGames()
     {
         // Arrange
-        var pair1 = CreatePair("p1", "John", "Doe", "Jane", "Smith");
-        var pair2 = CreatePair("p2", "Bob", "Johnson", "Alice", "Brown");
+        var pair1 = CreatePair("John", "Doe", "Jane", "Smith");
+        var pair2 = CreatePair("Bob", "Johnson", "Alice", "Brown");
         var tournaments = new[] { CreateTournamentWithGames("t1", pair1, pair2, 3) };
 
         // Act
-        var result = _gameService.GetGamesForPair(tournaments, "p1").ToList();
+        var result = _gameService.GetGamesForPair(tournaments, pair1.Id).ToList();
 
         // Assert
         result.Should().HaveCount(3);
@@ -33,12 +33,12 @@ public class GameServiceTests
     public void GetGamesForPair_WithNonExistentPairId_ReturnsEmptyList()
     {
         // Arrange
-        var pair1 = CreatePair("p1", "John", "Doe", "Jane", "Smith");
-        var pair2 = CreatePair("p2", "Bob", "Johnson", "Alice", "Brown");
+        var pair1 = CreatePair("John", "Doe", "Jane", "Smith");
+        var pair2 = CreatePair("Bob", "Johnson", "Alice", "Brown");
         var tournaments = new[] { CreateTournamentWithGames("t1", pair1, pair2, 2) };
 
         // Act
-        var result = _gameService.GetGamesForPair(tournaments, "p999");
+        var result = _gameService.GetGamesForPair(tournaments, "nonexistent-id-12345");
 
         // Assert
         result.Should().BeEmpty();
@@ -48,8 +48,8 @@ public class GameServiceTests
     public void GetGamesForPair_OrdersGamesByRoundThenCourtNumber()
     {
         // Arrange
-        var pair1 = CreatePair("p1", "John", "Doe", "Jane", "Smith");
-        var pair2 = CreatePair("p2", "Bob", "Johnson", "Alice", "Brown");
+        var pair1 = CreatePair("John", "Doe", "Jane", "Smith");
+        var pair2 = CreatePair("Bob", "Johnson", "Alice", "Brown");
         
         var games = new[]
         {
@@ -67,7 +67,7 @@ public class GameServiceTests
         };
 
         // Act
-        var result = _gameService.GetGamesForPair(new[] { tournament }, "p1").ToList();
+        var result = _gameService.GetGamesForPair(new[] { tournament }, pair1.Id).ToList();
 
         // Assert
         result.Should().HaveCount(4);
@@ -85,8 +85,8 @@ public class GameServiceTests
     public void GetGamesForPair_IncludesIsOurGameFlag_WhenPairIsPair1()
     {
         // Arrange
-        var pair1 = CreatePair("p1", "John", "Doe", "Jane", "Smith");
-        var pair2 = CreatePair("p2", "Bob", "Johnson", "Alice", "Brown");
+        var pair1 = CreatePair("John", "Doe", "Jane", "Smith");
+        var pair2 = CreatePair("Bob", "Johnson", "Alice", "Brown");
         var game = CreateGame("g1", 1, 1, pair1, pair2);
         
         var tournament = new Tournament
@@ -97,7 +97,7 @@ public class GameServiceTests
         };
 
         // Act
-        var result = _gameService.GetGamesForPair(new[] { tournament }, "p1").First();
+        var result = _gameService.GetGamesForPair(new[] { tournament }, pair1.Id).First();
 
         // Assert
         result.IsOurGame.Should().BeTrue();
@@ -107,8 +107,8 @@ public class GameServiceTests
     public void GetGamesForPair_IncludesIsOurGameFlag_WhenPairIsPair2()
     {
         // Arrange
-        var pair1 = CreatePair("p1", "John", "Doe", "Jane", "Smith");
-        var pair2 = CreatePair("p2", "Bob", "Johnson", "Alice", "Brown");
+        var pair1 = CreatePair("John", "Doe", "Jane", "Smith");
+        var pair2 = CreatePair("Bob", "Johnson", "Alice", "Brown");
         var game = CreateGame("g1", 1, 1, pair1, pair2);
         
         var tournament = new Tournament
@@ -119,7 +119,7 @@ public class GameServiceTests
         };
 
         // Act
-        var result = _gameService.GetGamesForPair(new[] { tournament }, "p2").First();
+        var result = _gameService.GetGamesForPair(new[] { tournament }, pair2.Id).First();
 
         // Assert
         result.IsOurGame.Should().BeFalse();
@@ -129,8 +129,8 @@ public class GameServiceTests
     public void GetGamesForPair_IncludesAllRequiredGameFields()
     {
         // Arrange
-        var pair1 = CreatePair("p1", "John", "Doe", "Jane", "Smith");
-        var pair2 = CreatePair("p2", "Bob", "Johnson", "Alice", "Brown");
+        var pair1 = CreatePair("John", "Doe", "Jane", "Smith");
+        var pair2 = CreatePair("Bob", "Johnson", "Alice", "Brown");
         var game = CreateGame("g1", 1, 5, pair1, pair2);
         game.Status = GameStatus.InProgress;
         game.ScheduledTime = DateTime.UtcNow;
@@ -143,7 +143,7 @@ public class GameServiceTests
         };
 
         // Act
-        var result = _gameService.GetGamesForPair(new[] { tournament }, "p1").First();
+        var result = _gameService.GetGamesForPair(new[] { tournament }, pair1.Id).First();
 
         // Assert
         result.Id.Should().Be("g1");
@@ -169,7 +169,7 @@ public class GameServiceTests
     public void GetGamesForPair_WithNullTournaments_ReturnsEmptyList()
     {
         // Act
-        var result = _gameService.GetGamesForPair(null, "p1");
+        var result = _gameService.GetGamesForPair(null!, "p1");
 
         // Assert
         result.Should().BeEmpty();
@@ -179,12 +179,12 @@ public class GameServiceTests
     public void GetGamesForPair_WithNullOrEmptyPairId_ReturnsEmptyList()
     {
         // Arrange
-        var pair1 = CreatePair("p1", "John", "Doe", "Jane", "Smith");
-        var pair2 = CreatePair("p2", "Bob", "Johnson", "Alice", "Brown");
+        var pair1 = CreatePair("John", "Doe", "Jane", "Smith");
+        var pair2 = CreatePair("Bob", "Johnson", "Alice", "Brown");
         var tournaments = new[] { CreateTournamentWithGames("t1", pair1, pair2, 2) };
 
         // Act
-        var resultNull = _gameService.GetGamesForPair(tournaments, null);
+        var resultNull = _gameService.GetGamesForPair(tournaments, null!);
         var resultEmpty = _gameService.GetGamesForPair(tournaments, "");
 
         // Assert
@@ -196,8 +196,8 @@ public class GameServiceTests
     public void GetGamesForPair_WithMultipleTournaments_ReturnsAllMatchingGames()
     {
         // Arrange
-        var pair1 = CreatePair("p1", "John", "Doe", "Jane", "Smith");
-        var pair2 = CreatePair("p2", "Bob", "Johnson", "Alice", "Brown");
+        var pair1 = CreatePair("John", "Doe", "Jane", "Smith");
+        var pair2 = CreatePair("Bob", "Johnson", "Alice", "Brown");
         
         var tournaments = new[]
         {
@@ -206,7 +206,7 @@ public class GameServiceTests
         };
 
         // Act
-        var result = _gameService.GetGamesForPair(tournaments, "p1");
+        var result = _gameService.GetGamesForPair(tournaments, pair1.Id);
 
         // Assert
         result.Should().HaveCount(5);
@@ -242,7 +242,7 @@ public class GameServiceTests
         };
     }
 
-    private Pair CreatePair(string id, string player1FirstName, string player1LastName,
+    private Pair CreatePair(string player1FirstName, string player1LastName,
         string player2FirstName, string player2LastName)
     {
         var player1 = new Player
@@ -257,11 +257,15 @@ public class GameServiceTests
             Surname = player2LastName
         };
 
-        return new Pair
+        var pair = new Pair
         {
-            Id = id,
             Player1 = player1,
             Player2 = player2
         };
+        
+        // Access Id to trigger generation
+        _ = pair.Id;
+        
+        return pair;
     }
 }

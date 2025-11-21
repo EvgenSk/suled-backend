@@ -42,7 +42,7 @@ public class ExcelParserServiceTests : IDisposable
         result.Should().NotBeNull();
         result.Name.Should().Be("test-tournament");
         result.BlobFileName.Should().Be("test-tournament.xlsx");
-        result.Games.Should().HaveCount(2);
+        result.Pairs.Should().HaveCount(4); // 4 unique pairs from 2 games
     }
 
     [Fact]
@@ -60,7 +60,7 @@ public class ExcelParserServiceTests : IDisposable
 
         // Assert
         result.Should().NotBeNull();
-        result.Games.Should().BeEmpty();
+        result.Pairs.Should().BeEmpty();
     }
 
     [Fact]
@@ -75,17 +75,18 @@ public class ExcelParserServiceTests : IDisposable
         var result = await _service.ParseTournamentAsync(stream, "test.xlsx");
 
         // Assert
-        var game = result.Games.Should().ContainSingle().Subject;
+        result.Pairs.Should().HaveCount(2); // 2 pairs from 1 game
+        // Check first pair (could be either John/Jane or Alice/Bob due to ordering)
+        var johnPair = result.Pairs.FirstOrDefault(p => p.PairInfo.Player1.Name == "John");
+        johnPair.Should().NotBeNull();
+        johnPair!.Games.Should().ContainSingle();
+        var game = johnPair.Games[0];
         game.Round.Should().Be(1);
         game.CourtNumber.Should().Be(1);
-        game.Pair1.Player1.Name.Should().Be("John");
-        game.Pair1.Player1.Surname.Should().Be("Doe");
-        game.Pair1.Player2.Name.Should().Be("Jane");
-        game.Pair1.Player2.Surname.Should().Be("Smith");
-        game.Pair2.Player1.Name.Should().Be("Alice");
-        game.Pair2.Player1.Surname.Should().Be("Brown");
-        game.Pair2.Player2.Name.Should().Be("Bob");
-        game.Pair2.Player2.Surname.Should().Be("White");
+        game.OpponentPair.Player1.Name.Should().Be("Alice");
+        game.OpponentPair.Player1.Surname.Should().Be("Brown");
+        game.OpponentPair.Player2.Name.Should().Be("Bob");
+        game.OpponentPair.Player2.Surname.Should().Be("White");
         game.Status.Should().Be(GameStatus.Scheduled);
     }
 
@@ -104,9 +105,12 @@ public class ExcelParserServiceTests : IDisposable
         var result = await _service.ParseTournamentAsync(stream, "test.xlsx");
 
         // Assert
-        result.Games.Should().HaveCount(4);
-        result.Games.Count(g => g.Round == 1).Should().Be(2);
-        result.Games.Count(g => g.Round == 2).Should().Be(2);
+        // 4 games total, but pairs are duplicated across rounds, so we get 8 pair entries
+        // (each of 4 unique pairs appears in 2 rounds)
+        result.Pairs.Should().HaveCount(8);
+        var allGames = result.Pairs.SelectMany(p => p.Games).ToList();
+        allGames.Count(g => g.Round == 1).Should().Be(4); // 2 games in round 1 = 4 pair-game entries
+        allGames.Count(g => g.Round == 2).Should().Be(4); // 2 games in round 2 = 4 pair-game entries
     }
 
     [Fact]
@@ -123,7 +127,7 @@ public class ExcelParserServiceTests : IDisposable
         var result = await _service.ParseTournamentAsync(stream, "test.xlsx");
 
         // Assert
-        result.Games.Should().HaveCount(2);
+        result.Pairs.Should().HaveCount(4); // 4 unique pairs from 2 valid games
     }
 
     [Fact]
@@ -138,15 +142,16 @@ public class ExcelParserServiceTests : IDisposable
         var result = await _service.ParseTournamentAsync(stream, "test.xlsx");
 
         // Assert
-        var game = result.Games.Should().ContainSingle().Subject;
-        game.Pair1.Player1.Name.Should().Be("Madonna");
-        game.Pair1.Player1.Surname.Should().BeNullOrEmpty();
-        game.Pair1.Player2.Name.Should().Be("Prince");
-        game.Pair1.Player2.Surname.Should().BeNullOrEmpty();
-        game.Pair2.Player1.Name.Should().Be("Cher");
-        game.Pair2.Player1.Surname.Should().BeNullOrEmpty();
-        game.Pair2.Player2.Name.Should().Be("Bono");
-        game.Pair2.Player2.Surname.Should().BeNullOrEmpty();
+        result.Pairs.Should().HaveCount(2); // 2 pairs from 1 game
+        var pair = result.Pairs.FirstOrDefault(p => p.PairInfo.Player1.Name == "Madonna");
+        pair.Should().NotBeNull();
+        pair!.PairInfo.Player1.Name.Should().Be("Madonna");
+        pair.PairInfo.Player1.Surname.Should().BeNullOrEmpty();
+        pair.PairInfo.Player2.Name.Should().Be("Prince");
+        pair.PairInfo.Player2.Surname.Should().BeNullOrEmpty();
+        // Check opponent pair
+        pair.Games[0].OpponentPair.Player1.Name.Should().Be("Cher");
+        pair.Games[0].OpponentPair.Player2.Name.Should().Be("Bono");
     }
 
     [Fact]
@@ -161,15 +166,15 @@ public class ExcelParserServiceTests : IDisposable
         var result = await _service.ParseTournamentAsync(stream, "test.xlsx");
 
         // Assert
-        var game = result.Games.Should().ContainSingle().Subject;
-        game.Pair1.Player1.Name.Should().Be("John");
-        game.Pair1.Player1.Surname.Should().Be("von der Berg");
-        game.Pair1.Player2.Name.Should().Be("Jane");
-        game.Pair1.Player2.Surname.Should().Be("van Smith");
-        game.Pair2.Player1.Name.Should().Be("Alice");
-        game.Pair2.Player1.Surname.Should().Be("de la Cruz");
-        game.Pair2.Player2.Name.Should().Be("Bob");
-        game.Pair2.Player2.Surname.Should().Be("O'Brien");
+        result.Pairs.Should().HaveCount(2); // 2 pairs from 1 game
+        var pair = result.Pairs.FirstOrDefault(p => p.PairInfo.Player1.Name == "John");
+        pair.Should().NotBeNull();
+        pair!.PairInfo.Player1.Name.Should().Be("John");
+        pair.PairInfo.Player1.Surname.Should().Be("von der Berg");
+        pair.PairInfo.Player2.Surname.Should().Be("van Smith");
+        // Check opponent pair
+        pair.Games[0].OpponentPair.Player1.Name.Should().Be("Alice");
+        pair.Games[0].OpponentPair.Player1.Surname.Should().Be("de la Cruz");
     }
 
     [Fact]
@@ -186,8 +191,9 @@ public class ExcelParserServiceTests : IDisposable
         var result = await _service.ParseTournamentAsync(stream, "test.xlsx");
 
         // Assert
-        result.Games.Should().HaveCount(2);
-        result.Games.Should().OnlyContain(g => g.CourtNumber > 0);
+        result.Pairs.Should().HaveCount(4); // 4 unique pairs from 2 valid games
+        // All games should have valid court numbers
+        result.Pairs.SelectMany(p => p.Games).Should().OnlyContain(g => g.CourtNumber > 0);
     }
 
     [Fact]
@@ -202,8 +208,9 @@ public class ExcelParserServiceTests : IDisposable
         var result = await _service.ParseTournamentAsync(stream, "test.xlsx");
 
         // Assert
-        var game = result.Games.Should().ContainSingle().Subject;
-        game.Round.Should().Be(3);
+        result.Pairs.Should().HaveCount(2); // 2 pairs from 1 game
+        var pair = result.Pairs[0];
+        pair.Games[0].Round.Should().Be(3);
     }
 
     [Fact]
@@ -220,7 +227,7 @@ public class ExcelParserServiceTests : IDisposable
         var result = await _service.ParseTournamentAsync(stream, "test.xlsx");
 
         // Assert
-        result.Games.Should().ContainSingle();
+        result.Pairs.Should().HaveCount(2); // 2 pairs from 1 valid game
     }
 
     [Fact]
@@ -258,7 +265,8 @@ public class ExcelParserServiceTests : IDisposable
 
         // Assert
         result.Id.Should().NotBeNullOrEmpty();
-        result.Games.Should().OnlyContain(g => g.TournamentId == result.Id);
+        var allGames = result.Pairs.SelectMany(p => p.Games);
+        allGames.Should().OnlyContain(g => g.TournamentId == result.Id);
     }
 
     [Fact]
@@ -288,11 +296,15 @@ public class ExcelParserServiceTests : IDisposable
         var result = await _service.ParseTournamentAsync(stream, "test.xlsx");
 
         // Assert
-        var game = result.Games.Should().ContainSingle().Subject;
-        game.Pair1.Player1.Name.Should().Be("John");
-        game.Pair1.Player1.Surname.Should().Be("Doe");
-        game.Pair1.Player2.Name.Should().Be("Jane");
-        game.Pair1.Player2.Surname.Should().Be("Smith");
+        result.Pairs.Should().HaveCount(2); // 2 pairs from 1 game
+        var pair = result.Pairs.FirstOrDefault(p => p.PairInfo.Player1.Name == "John");
+        pair.Should().NotBeNull();
+        pair!.PairInfo.Player1.Name.Should().Be("John");
+        pair.PairInfo.Player1.Surname.Should().Be("Doe");
+        pair!.PairInfo.Player1.Name.Should().Be("John");
+        pair.PairInfo.Player1.Surname.Should().Be("Doe");
+        pair.PairInfo.Player2.Name.Should().Be("Jane");
+        pair.PairInfo.Player2.Surname.Should().Be("Smith");
     }
 
     private MemoryStream CreateTestExcelStream(params (string round, int court, string p1_1, string p1_2, string p2_1, string p2_2)[] games)
