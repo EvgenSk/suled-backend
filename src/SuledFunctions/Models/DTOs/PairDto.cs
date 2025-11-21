@@ -9,4 +9,5 @@ public class PairDto
     public string DisplayName { get; set; } = string.Empty;
     public string Player1 { get; set; } = string.Empty;
     public string Player2 { get; set; } = string.Empty;
+    public int GameCount { get; set; }
 }

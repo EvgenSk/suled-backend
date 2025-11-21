@@ -303,11 +303,16 @@ public class ExcelParserService : IExcelParserService
         var player1 = ParsePlayer(player1Text);
         var player2 = ParsePlayer(player2Text);
 
-        return new Pair
+        var pair = new Pair
         {
             Player1 = player1,
             Player2 = player2
         };
+        
+        // Access Id to trigger generation (ensures consistent IDs)
+        _ = pair.Id;
+        
+        return pair;
     }
 
     private Player ParsePlayer(string playerText)

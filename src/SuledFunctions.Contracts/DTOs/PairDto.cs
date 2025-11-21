@@ -18,4 +18,7 @@ public class PairDto
     
     [JsonPropertyName("player2")]
     public string Player2 { get; set; } = string.Empty;
+    
+    [JsonPropertyName("gameCount")]
+    public int GameCount { get; set; }
 }
