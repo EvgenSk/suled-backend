@@ -3,6 +3,9 @@ using Microsoft.Azure.Functions.Worker.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using SuledFunctions.Services;
+using SuledFunctions.Services.Interfaces;
+using SuledFunctions.Services.Excel;
+using SuledFunctions.Services.Excel.Interfaces;
 using OfficeOpenXml;
 using Microsoft.Azure.Cosmos;
 using System.Text.Json;
@@ -50,9 +53,9 @@ builder.Services.AddScoped<IGameService, GameService>();
 builder.Services.AddScoped<ITournamentService, TournamentService>();
 
 // Register Excel parsing components
-builder.Services.AddScoped<SuledFunctions.Services.Excel.IExcelMetadataExtractor, SuledFunctions.Services.Excel.ExcelMetadataExtractor>();
-builder.Services.AddScoped<SuledFunctions.Services.Excel.IExcelGameParser, SuledFunctions.Services.Excel.ExcelGameParser>();
-builder.Services.AddScoped<SuledFunctions.Services.Excel.IPairStructureConverter, SuledFunctions.Services.Excel.PairStructureConverter>();
+builder.Services.AddScoped<IExcelMetadataExtractor, ExcelMetadataExtractor>();
+builder.Services.AddScoped<IExcelGameParser, ExcelGameParser>();
+builder.Services.AddScoped<IPairStructureConverter, PairStructureConverter>();
 
 builder.Services
     .AddApplicationInsightsTelemetryWorkerService()

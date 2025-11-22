@@ -1,6 +1,6 @@
 using SuledFunctions.Models;
 
-namespace SuledFunctions.Services;
+namespace SuledFunctions.Services.Interfaces;
 
 /// <summary>
 /// Interface for parsing tournament Excel files

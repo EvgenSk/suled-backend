@@ -1,6 +1,7 @@
 using FluentAssertions;
 using SuledFunctions.Models;
 using SuledFunctions.Services;
+using SuledFunctions.Services.Interfaces;
 
 namespace SuledFunctions.Tests.Services;
 

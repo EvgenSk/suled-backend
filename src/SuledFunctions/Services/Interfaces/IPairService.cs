@@ -1,7 +1,7 @@
 using SuledFunctions.Models;
 using SuledFunctions.Models.DTOs;
 
-namespace SuledFunctions.Services;
+namespace SuledFunctions.Services.Interfaces;
 
 /// <summary>
 /// Interface for pair-related business logic

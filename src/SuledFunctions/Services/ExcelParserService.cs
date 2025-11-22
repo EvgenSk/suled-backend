@@ -1,7 +1,8 @@
 using Microsoft.Extensions.Logging;
 using OfficeOpenXml;
 using SuledFunctions.Models;
-using SuledFunctions.Services.Excel;
+using SuledFunctions.Services.Excel.Interfaces;
+using SuledFunctions.Services.Interfaces;
 
 namespace SuledFunctions.Services;
 

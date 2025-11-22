@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using SuledFunctions.Models;
 using SuledFunctions.Services;
+using SuledFunctions.Services.Interfaces;
 
 namespace SuledFunctions.Tests.Services;
 

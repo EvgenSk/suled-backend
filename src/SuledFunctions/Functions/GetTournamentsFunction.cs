@@ -2,7 +2,7 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using System.Net;
-using SuledFunctions.Services;
+using SuledFunctions.Services.Interfaces;
 using SuledFunctions.Contracts.DTOs;
 using SuledFunctions.Models;
 

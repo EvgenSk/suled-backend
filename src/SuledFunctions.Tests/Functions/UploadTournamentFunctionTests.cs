@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 using SuledFunctions.Functions;
 using SuledFunctions.Models;
-using SuledFunctions.Services;
+using SuledFunctions.Services.Interfaces;
 using SuledFunctions.Tests.Helpers;
 using System.Net;
 using System.Text;

@@ -1,7 +1,7 @@
 using OfficeOpenXml;
 using SuledFunctions.Models;
 
-namespace SuledFunctions.Services.Excel;
+namespace SuledFunctions.Services.Excel.Interfaces;
 
 /// <summary>
 /// Interface for parsing game data from Excel worksheets

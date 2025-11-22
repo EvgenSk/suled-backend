@@ -1,5 +1,6 @@
 using SuledFunctions.Models;
 using SuledFunctions.Models.DTOs;
+using SuledFunctions.Services.Interfaces;
 
 namespace SuledFunctions.Services;
 

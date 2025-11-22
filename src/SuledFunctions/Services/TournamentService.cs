@@ -1,6 +1,7 @@
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
 using SuledFunctions.Models;
+using SuledFunctions.Services.Interfaces;
 
 namespace SuledFunctions.Services;
 

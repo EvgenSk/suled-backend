@@ -5,6 +5,7 @@ using OfficeOpenXml;
 using SuledFunctions.Models;
 using SuledFunctions.Services;
 using SuledFunctions.Services.Excel;
+using SuledFunctions.Services.Excel.Interfaces;
 
 namespace SuledFunctions.Tests.Services;
 
