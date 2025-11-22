@@ -14,6 +14,7 @@ public class ExcelParserServiceTests : IDisposable
     private readonly Mock<ILogger<ExcelParserService>> _loggerMock;
     private readonly Mock<ILogger<ExcelMetadataExtractor>> _metadataLoggerMock;
     private readonly Mock<ILogger<ExcelGameParser>> _gameParserLoggerMock;
+    private readonly Mock<ILogger<RoundCalculationService>> _roundCalculationLoggerMock;
     private readonly ExcelParserService _service;
 
     public ExcelParserServiceTests()
@@ -24,15 +25,18 @@ public class ExcelParserServiceTests : IDisposable
         _loggerMock = new Mock<ILogger<ExcelParserService>>();
         _metadataLoggerMock = new Mock<ILogger<ExcelMetadataExtractor>>();
         _gameParserLoggerMock = new Mock<ILogger<ExcelGameParser>>();
+        _roundCalculationLoggerMock = new Mock<ILogger<RoundCalculationService>>();
         
         var metadataExtractor = new ExcelMetadataExtractor(_metadataLoggerMock.Object);
         var gameParser = new ExcelGameParser(_gameParserLoggerMock.Object);
         var pairConverter = new PairStructureConverter();
+        var roundCalculationService = new RoundCalculationService(_roundCalculationLoggerMock.Object);
         
         _service = new ExcelParserService(
             metadataExtractor,
             gameParser,
             pairConverter,
+            roundCalculationService,
             _loggerMock.Object);
     }
 
@@ -328,6 +332,107 @@ public class ExcelParserServiceTests : IDisposable
         var worksheet = package.Workbook.Worksheets.Add("Test");
         
         // Add header row
+        worksheet.Cells[1, 1].Value = "Round";
+        worksheet.Cells[1, 2].Value = "Court";
+        worksheet.Cells[1, 3].Value = "Player 1.1";
+        worksheet.Cells[1, 4].Value = "Player 1.2";
+        worksheet.Cells[1, 7].Value = "Player 2.1";
+        worksheet.Cells[1, 8].Value = "Player 2.2";
+
+        // Add game data
+        for (int i = 0; i < games.Length; i++)
+        {
+            int row = i + 2;
+            var game = games[i];
+            
+            if (!string.IsNullOrEmpty(game.round))
+                worksheet.Cells[row, 1].Value = game.round;
+            if (game.court > 0)
+                worksheet.Cells[row, 2].Value = game.court;
+            
+            worksheet.Cells[row, 3].Value = game.p1_1;
+            worksheet.Cells[row, 4].Value = game.p1_2;
+            worksheet.Cells[row, 7].Value = game.p2_1;
+            worksheet.Cells[row, 8].Value = game.p2_2;
+        }
+
+        var stream = new MemoryStream();
+        package.SaveAs(stream);
+        stream.Position = 0;
+        return stream;
+    }
+
+    [Fact]
+    public async Task ParseTournamentAsync_CalculatesRounds()
+    {
+        // Arrange
+        using var stream = CreateTestExcelStreamWithMetadata(
+            startDate: "22.11.2025",
+            startTime: "09:00",
+            endTime: "18:00",
+            ("Round 1", 1, "John Doe", "Jane Smith", "Alice Brown", "Bob White"),
+            ("Round 1", 2, "Charlie Davis", "Diana Evans", "Frank Green", "Grace Harris"),
+            ("Round 2", 1, "John Doe", "Jane Smith", "Frank Green", "Grace Harris"),
+            ("Round 2", 2, "Alice Brown", "Bob White", "Charlie Davis", "Diana Evans")
+        );
+
+        // Act
+        var result = await _service.ParseTournamentAsync(stream, "test-tournament.xlsx");
+
+        // Assert
+        result.Rounds.Should().NotBeEmpty();
+        result.Rounds.Should().HaveCount(2);
+        
+        result.Rounds[0].RoundNumber.Should().Be(1);
+        result.Rounds[0].GameCount.Should().Be(2);
+        result.Rounds[0].StartTime.Should().Be(new DateTime(2025, 11, 22, 9, 0, 0));
+        
+        result.Rounds[1].RoundNumber.Should().Be(2);
+        result.Rounds[1].GameCount.Should().Be(2);
+        result.Rounds[1].StartTime.Should().BeAfter(result.Rounds[0].EndTime);
+    }
+
+    [Fact]
+    public async Task ParseTournamentAsync_WithoutMetadata_StillCalculatesRounds()
+    {
+        // Arrange
+        using var stream = CreateTestExcelStream(
+            ("Round 1", 1, "John Doe", "Jane Smith", "Alice Brown", "Bob White"),
+            ("Round 2", 1, "John Doe", "Jane Smith", "Charlie Davis", "Diana Evans")
+        );
+
+        // Act
+        var result = await _service.ParseTournamentAsync(stream, "test.xlsx");
+
+        // Assert
+        result.Rounds.Should().NotBeEmpty();
+        result.Rounds.Should().HaveCount(2);
+        result.Rounds[0].RoundNumber.Should().Be(1);
+        result.Rounds[1].RoundNumber.Should().Be(2);
+    }
+
+    private MemoryStream CreateTestExcelStreamWithMetadata(
+        string startDate,
+        string startTime,
+        string endTime,
+        params (string round, int court, string p1_1, string p1_2, string p2_1, string p2_2)[] games)
+    {
+        var package = new ExcelPackage();
+        var worksheet = package.Workbook.Worksheets.Add("Tournament");
+
+        // Add metadata in columns J and K (10 and 11)
+        worksheet.Cells[1, 10].Value = "Tournament Name:";
+        worksheet.Cells[1, 11].Value = "Test Tournament";
+        worksheet.Cells[2, 10].Value = "Date:";
+        worksheet.Cells[2, 11].Value = startDate;
+        worksheet.Cells[3, 10].Value = "Start Time:";
+        worksheet.Cells[3, 11].Value = startTime;
+        worksheet.Cells[4, 10].Value = "End Time:";
+        worksheet.Cells[4, 11].Value = endTime;
+        worksheet.Cells[5, 10].Value = "Location:";
+        worksheet.Cells[5, 11].Value = "Test Location";
+
+        // Add headers for game data
         worksheet.Cells[1, 1].Value = "Round";
         worksheet.Cells[1, 2].Value = "Court";
         worksheet.Cells[1, 3].Value = "Player 1.1";

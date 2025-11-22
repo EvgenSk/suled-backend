@@ -25,6 +25,9 @@ public record Tournament
     public string Rules { get; set; } = string.Empty;
     public TournamentStatus Status { get; set; } = TournamentStatus.Upcoming;
     
+    // Round scheduling information
+    public List<TournamentRound> Rounds { get; set; } = new();
+    
     // Pair-centered: Tournament contains pairs, each with their games
     public List<TournamentPair> Pairs { get; set; } = new();
     

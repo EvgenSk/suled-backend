@@ -36,4 +36,7 @@ public record TournamentListDto
     
     [JsonPropertyName("createdDate")]
     public DateTime CreatedDate { get; init; }
+    
+    [JsonPropertyName("rounds")]
+    public List<TournamentRoundDto> Rounds { get; init; } = new();
 }

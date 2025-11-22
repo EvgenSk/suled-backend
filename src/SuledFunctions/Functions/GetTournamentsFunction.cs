@@ -93,7 +93,14 @@ public class GetTournamentsFunction
                 Description = t.Description,
                 Status = t.Status.ToString(),
                 GameCount = t.Games?.Count ?? 0,
-                CreatedDate = t.CreatedDate
+                CreatedDate = t.CreatedDate,
+                Rounds = t.Rounds?.Select(r => new TournamentRoundDto
+                {
+                    RoundNumber = r.RoundNumber,
+                    StartTime = r.StartTime,
+                    EndTime = r.EndTime,
+                    GameCount = r.GameCount
+                }).ToList() ?? new List<TournamentRoundDto>()
             }).ToList();
 
             _logger.LogInformation("Returning {Count} tournaments", tournamentDtos.Count);

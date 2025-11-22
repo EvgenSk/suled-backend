@@ -51,6 +51,7 @@ builder.Services.AddScoped<IExcelParserService, ExcelParserService>();
 builder.Services.AddScoped<IPairService, PairService>();
 builder.Services.AddScoped<IGameService, GameService>();
 builder.Services.AddScoped<ITournamentService, TournamentService>();
+builder.Services.AddScoped<IRoundCalculationService, RoundCalculationService>();
 
 // Register Excel parsing components
 builder.Services.AddScoped<IExcelMetadataExtractor, ExcelMetadataExtractor>();

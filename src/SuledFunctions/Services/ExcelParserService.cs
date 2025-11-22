@@ -15,17 +15,20 @@ public class ExcelParserService : IExcelParserService
     private readonly IExcelMetadataExtractor _metadataExtractor;
     private readonly IExcelGameParser _gameParser;
     private readonly IPairStructureConverter _pairConverter;
+    private readonly IRoundCalculationService _roundCalculationService;
     private readonly ILogger<ExcelParserService> _logger;
 
     public ExcelParserService(
         IExcelMetadataExtractor metadataExtractor,
         IExcelGameParser gameParser,
         IPairStructureConverter pairConverter,
+        IRoundCalculationService roundCalculationService,
         ILogger<ExcelParserService> logger)
     {
         _metadataExtractor = metadataExtractor;
         _gameParser = gameParser;
         _pairConverter = pairConverter;
+        _roundCalculationService = roundCalculationService;
         _logger = logger;
     }
 
@@ -61,12 +64,15 @@ public class ExcelParserService : IExcelParserService
             // Convert game-centered data to pair-centered structure
             tournament.Pairs = _pairConverter.ConvertGamesToPairCentricStructure(games, tournament.Id);
             
+            // Calculate round schedules based on tournament metadata and games
+            tournament.Rounds = _roundCalculationService.CalculateRounds(tournament);
+            
             // Auto-determine tournament status based on dates
             _metadataExtractor.DetermineStatus(tournament);
 
             var totalGames = tournament.Pairs.Sum(p => p.Games.Count);
-            _logger.LogInformation("Parsed {PairCount} pairs with {GameCount} total games from tournament {TournamentName}", 
-                tournament.Pairs.Count, totalGames, tournament.Name);
+            _logger.LogInformation("Parsed {PairCount} pairs with {GameCount} total games and {RoundCount} rounds from tournament {TournamentName}", 
+                tournament.Pairs.Count, totalGames, tournament.Rounds.Count, tournament.Name);
 
             return tournament;
         }
