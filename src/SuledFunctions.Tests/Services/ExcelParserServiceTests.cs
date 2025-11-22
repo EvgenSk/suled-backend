@@ -4,12 +4,15 @@ using Moq;
 using OfficeOpenXml;
 using SuledFunctions.Models;
 using SuledFunctions.Services;
+using SuledFunctions.Services.Excel;
 
 namespace SuledFunctions.Tests.Services;
 
 public class ExcelParserServiceTests : IDisposable
 {
     private readonly Mock<ILogger<ExcelParserService>> _loggerMock;
+    private readonly Mock<ILogger<ExcelMetadataExtractor>> _metadataLoggerMock;
+    private readonly Mock<ILogger<ExcelGameParser>> _gameParserLoggerMock;
     private readonly ExcelParserService _service;
 
     public ExcelParserServiceTests()
@@ -18,7 +21,18 @@ public class ExcelParserServiceTests : IDisposable
         ExcelPackage.License.SetNonCommercialPersonal("Test");
         
         _loggerMock = new Mock<ILogger<ExcelParserService>>();
-        _service = new ExcelParserService(_loggerMock.Object);
+        _metadataLoggerMock = new Mock<ILogger<ExcelMetadataExtractor>>();
+        _gameParserLoggerMock = new Mock<ILogger<ExcelGameParser>>();
+        
+        var metadataExtractor = new ExcelMetadataExtractor(_metadataLoggerMock.Object);
+        var gameParser = new ExcelGameParser(_gameParserLoggerMock.Object);
+        var pairConverter = new PairStructureConverter();
+        
+        _service = new ExcelParserService(
+            _loggerMock.Object,
+            metadataExtractor,
+            gameParser,
+            pairConverter);
     }
 
     public void Dispose()

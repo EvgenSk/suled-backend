@@ -49,6 +49,11 @@ builder.Services.AddScoped<IPairService, PairService>();
 builder.Services.AddScoped<IGameService, GameService>();
 builder.Services.AddScoped<ITournamentService, TournamentService>();
 
+// Register Excel parsing components
+builder.Services.AddScoped<SuledFunctions.Services.Excel.IExcelMetadataExtractor, SuledFunctions.Services.Excel.ExcelMetadataExtractor>();
+builder.Services.AddScoped<SuledFunctions.Services.Excel.IExcelGameParser, SuledFunctions.Services.Excel.ExcelGameParser>();
+builder.Services.AddScoped<SuledFunctions.Services.Excel.IPairStructureConverter, SuledFunctions.Services.Excel.PairStructureConverter>();
+
 builder.Services
     .AddApplicationInsightsTelemetryWorkerService()
     .ConfigureFunctionsApplicationInsights();
