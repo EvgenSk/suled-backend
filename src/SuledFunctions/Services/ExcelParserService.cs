@@ -1,6 +1,7 @@
+using Microsoft.Extensions.Logging;
 using OfficeOpenXml;
 using SuledFunctions.Models;
-using Microsoft.Extensions.Logging;
+using System.Globalization;
 
 namespace SuledFunctions.Services;
 
@@ -142,8 +143,11 @@ public class ExcelParserService : IExcelParserService
                 else if (labelCell.Contains("Date", StringComparison.OrdinalIgnoreCase) ||
                          labelCell.Contains("Start", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (DateTime.TryParse(valueCell, out var date))
-                        tournament.StartDate = date;
+                    if (DateTime.TryParseExact(valueCell, "dd'.'MM'.'yyyy",
+						   CultureInfo.InvariantCulture,
+						   DateTimeStyles.None,
+						   out var date))
+						tournament.StartDate = date;
                 }
                 else if (labelCell.Contains("Division", StringComparison.OrdinalIgnoreCase) ||
                          labelCell.Contains("Category", StringComparison.OrdinalIgnoreCase))
