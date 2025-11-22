@@ -170,16 +170,53 @@ public class PairServiceTests
     // Helper methods
     private Tournament CreateTournament(string id, params Pair[] pairs)
     {
-        var games = new List<Game>();
+        var tournamentPairs = new List<TournamentPair>();
+        
+        // Create games between consecutive pairs
         for (int i = 0; i < pairs.Length - 1; i++)
         {
-            games.Add(new Game
+            var pair1 = pairs[i];
+            var pair2 = pairs[i + 1];
+            
+            var game = new PairGame
             {
                 Id = $"{id}-game{i}",
                 Round = 1,
                 CourtNumber = i + 1,
-                Pair1 = pairs[i],
-                Pair2 = pairs[i + 1],
+                OpponentPair = pair2,
+                Status = GameStatus.Scheduled
+            };
+            
+            // Add the game to pair1's games list
+            var tournamentPair1 = tournamentPairs.FirstOrDefault(tp => tp.PairInfo.Id == pair1.Id);
+            if (tournamentPair1 == null)
+            {
+                tournamentPair1 = new TournamentPair
+                {
+                    PairInfo = pair1,
+                    Games = new List<PairGame>()
+                };
+                tournamentPairs.Add(tournamentPair1);
+            }
+            tournamentPair1.Games.Add(game);
+            
+            // Add the reverse game to pair2's games list
+            var tournamentPair2 = tournamentPairs.FirstOrDefault(tp => tp.PairInfo.Id == pair2.Id);
+            if (tournamentPair2 == null)
+            {
+                tournamentPair2 = new TournamentPair
+                {
+                    PairInfo = pair2,
+                    Games = new List<PairGame>()
+                };
+                tournamentPairs.Add(tournamentPair2);
+            }
+            tournamentPair2.Games.Add(new PairGame
+            {
+                Id = $"{id}-game{i}",
+                Round = 1,
+                CourtNumber = i + 1,
+                OpponentPair = pair1,
                 Status = GameStatus.Scheduled
             });
         }
@@ -188,7 +225,7 @@ public class PairServiceTests
         {
             Id = id,
             Name = $"Tournament {id}",
-            Games = games
+            Pairs = tournamentPairs
         };
     }
 

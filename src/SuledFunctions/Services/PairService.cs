@@ -21,32 +21,26 @@ public class PairService : IPairService
             return Enumerable.Empty<PairDto>();
         }
 
-        // Get all games and extract pairs with their game counts
-        var allGames = tournaments
-            .Where(t => t.Games != null)
-            .SelectMany(t => t.Games)
-            .ToList();
-
-        // Extract all pairs from games and count how many games each pair played
-        var pairGameCounts = allGames
-            .SelectMany(g => new[] { g.Pair1, g.Pair2 })
-            .Where(p => p != null)
-            .GroupBy(p => p.Id)
+        // Extract all tournament pairs and their game counts
+        var pairGameCounts = tournaments
+            .Where(t => t.Pairs != null)
+            .SelectMany(t => t.Pairs)
+            .GroupBy(tp => tp.PairInfo.Id)
             .Select(g => new 
             { 
-                Pair = g.First(),
-                GameCount = g.Count()
+                PairInfo = g.First().PairInfo,
+                GameCount = g.Sum(tp => tp.Games?.Count ?? 0)
             })
-            .OrderBy(pg => pg.Pair.DisplayName)
+            .OrderBy(pg => pg.PairInfo.DisplayName)
             .ToList();
 
         return pairGameCounts
             .Select(pg => new PairDto
             {
-                Id = pg.Pair.Id,
-                DisplayName = pg.Pair.DisplayName,
-                Player1 = pg.Pair.Player1.FullName,
-                Player2 = pg.Pair.Player2.FullName,
+                Id = pg.PairInfo.Id,
+                DisplayName = pg.PairInfo.DisplayName,
+                Player1 = pg.PairInfo.Player1.FullName,
+                Player2 = pg.PairInfo.Player2.FullName,
                 GameCount = pg.GameCount
             })
             .ToList();
