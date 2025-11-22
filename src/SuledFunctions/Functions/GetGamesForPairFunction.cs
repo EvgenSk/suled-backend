@@ -12,13 +12,13 @@ namespace SuledFunctions.Functions;
 /// </summary>
 public class GetGamesForPairFunction
 {
-    private readonly ILogger<GetGamesForPairFunction> _logger;
     private readonly IGameService _gameService;
+    private readonly ILogger<GetGamesForPairFunction> _logger;
 
-    public GetGamesForPairFunction(ILogger<GetGamesForPairFunction> logger, IGameService gameService)
+    public GetGamesForPairFunction(IGameService gameService, ILogger<GetGamesForPairFunction> logger)
     {
-        _logger = logger;
         _gameService = gameService;
+        _logger = logger;
     }
 
     [Function("GetGamesForPair")]

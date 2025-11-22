@@ -13,15 +13,15 @@ namespace SuledFunctions.Functions;
 /// </summary>
 public class GetTournamentsFunction
 {
-    private readonly ILogger<GetTournamentsFunction> _logger;
     private readonly ITournamentService _tournamentService;
+    private readonly ILogger<GetTournamentsFunction> _logger;
 
     public GetTournamentsFunction(
-        ILogger<GetTournamentsFunction> logger,
-        ITournamentService tournamentService)
+        ITournamentService tournamentService,
+        ILogger<GetTournamentsFunction> logger)
     {
-        _logger = logger;
         _tournamentService = tournamentService;
+        _logger = logger;
     }
 
     [Function("GetTournaments")]

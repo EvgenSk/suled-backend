@@ -30,10 +30,10 @@ public class ExcelParserServiceTests : IDisposable
         var pairConverter = new PairStructureConverter();
         
         _service = new ExcelParserService(
-            _loggerMock.Object,
             metadataExtractor,
             gameParser,
-            pairConverter);
+            pairConverter,
+            _loggerMock.Object);
     }
 
     public void Dispose()

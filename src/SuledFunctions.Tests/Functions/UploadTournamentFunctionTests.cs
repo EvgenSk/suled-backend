@@ -28,7 +28,7 @@ public class UploadTournamentFunctionTests
         _loggerMock = new Mock<ILogger<UploadTournamentFunction>>();
         _excelParserMock = new Mock<IExcelParserService>();
         _cosmosClientMock = new Mock<CosmosClient>();
-        _function = new UploadTournamentFunction(_loggerMock.Object, _excelParserMock.Object);
+        _function = new UploadTournamentFunction(_excelParserMock.Object, _loggerMock.Object);
         
         // Setup Cosmos DB mocks
         Environment.SetEnvironmentVariable("CosmosDbName", "TestDb");

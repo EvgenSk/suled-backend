@@ -10,17 +10,17 @@ namespace SuledFunctions.Services;
 /// </summary>
 public class TournamentService : ITournamentService
 {
-    private readonly ILogger<TournamentService> _logger;
     private readonly CosmosClient _cosmosClient;
     private readonly string _databaseName;
     private readonly string _containerName;
+    private readonly ILogger<TournamentService> _logger;
 
     public TournamentService(
-        ILogger<TournamentService> logger,
-        CosmosClient cosmosClient)
+        CosmosClient cosmosClient,
+        ILogger<TournamentService> logger)
     {
-        _logger = logger;
         _cosmosClient = cosmosClient;
+        _logger = logger;
         _databaseName = Environment.GetEnvironmentVariable("CosmosDbName") 
             ?? throw new InvalidOperationException("CosmosDbName not configured");
         _containerName = Environment.GetEnvironmentVariable("CosmosContainerName") 

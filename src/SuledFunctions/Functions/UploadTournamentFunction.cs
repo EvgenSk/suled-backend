@@ -12,15 +12,15 @@ namespace SuledFunctions.Functions;
 /// </summary>
 public class UploadTournamentFunction
 {
-    private readonly ILogger<UploadTournamentFunction> _logger;
     private readonly IExcelParserService _excelParser;
+    private readonly ILogger<UploadTournamentFunction> _logger;
 
     public UploadTournamentFunction(
-        ILogger<UploadTournamentFunction> logger,
-        IExcelParserService excelParser)
+        IExcelParserService excelParser,
+        ILogger<UploadTournamentFunction> logger)
     {
-        _logger = logger;
         _excelParser = excelParser;
+        _logger = logger;
     }
 
     [Function("UploadTournament")]

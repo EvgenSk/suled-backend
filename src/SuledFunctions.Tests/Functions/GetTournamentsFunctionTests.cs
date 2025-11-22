@@ -24,7 +24,7 @@ public class GetTournamentsFunctionTests
     {
         _loggerMock = new Mock<ILogger<GetTournamentsFunction>>();
         _tournamentServiceMock = new Mock<ITournamentService>();
-        _function = new GetTournamentsFunction(_loggerMock.Object, _tournamentServiceMock.Object);
+        _function = new GetTournamentsFunction(_tournamentServiceMock.Object, _loggerMock.Object);
     }
 
     [Fact]

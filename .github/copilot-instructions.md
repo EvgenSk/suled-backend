@@ -33,3 +33,11 @@
 - **Pair-Centered Data Structure**: Tournaments contain Pairs, each Pair contains their Games
 - Models: `Tournament` → `TournamentPair` → `PairGame` (with OpponentPair)
 - Always maintain this structure when making changes
+
+## Code Style Guidelines
+- **Logger Parameter Positioning**: ILogger parameters should ALWAYS be the last parameter in:
+  - Constructor parameter lists
+  - Field declarations (place `_logger` field last)
+  - Method parameters (if applicable)
+  - Any other context where logger appears alongside other dependencies
+  - This improves code readability by keeping the primary dependencies first

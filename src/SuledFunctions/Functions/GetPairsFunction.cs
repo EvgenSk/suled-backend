@@ -12,13 +12,13 @@ namespace SuledFunctions.Functions;
 /// </summary>
 public class GetPairsFunction
 {
-    private readonly ILogger<GetPairsFunction> _logger;
     private readonly IPairService _pairService;
+    private readonly ILogger<GetPairsFunction> _logger;
 
-    public GetPairsFunction(ILogger<GetPairsFunction> logger, IPairService pairService)
+    public GetPairsFunction(IPairService pairService, ILogger<GetPairsFunction> logger)
     {
-        _logger = logger;
         _pairService = pairService;
+        _logger = logger;
     }
 
     [Function("GetPairs")]

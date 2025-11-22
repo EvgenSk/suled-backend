@@ -12,21 +12,21 @@ namespace SuledFunctions.Services;
 /// </summary>
 public class ExcelParserService : IExcelParserService
 {
-    private readonly ILogger<ExcelParserService> _logger;
     private readonly IExcelMetadataExtractor _metadataExtractor;
     private readonly IExcelGameParser _gameParser;
     private readonly IPairStructureConverter _pairConverter;
+    private readonly ILogger<ExcelParserService> _logger;
 
     public ExcelParserService(
-        ILogger<ExcelParserService> logger,
         IExcelMetadataExtractor metadataExtractor,
         IExcelGameParser gameParser,
-        IPairStructureConverter pairConverter)
+        IPairStructureConverter pairConverter,
+        ILogger<ExcelParserService> logger)
     {
-        _logger = logger;
         _metadataExtractor = metadataExtractor;
         _gameParser = gameParser;
         _pairConverter = pairConverter;
+        _logger = logger;
     }
 
     /// <summary>

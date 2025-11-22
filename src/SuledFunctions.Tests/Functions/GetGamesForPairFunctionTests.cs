@@ -24,7 +24,7 @@ public class GetGamesForPairFunctionTests
     {
         _loggerMock = new Mock<ILogger<GetGamesForPairFunction>>();
         var gameService = new GameService(); // Use real service instead of mock
-        _function = new GetGamesForPairFunction(_loggerMock.Object, gameService);
+        _function = new GetGamesForPairFunction(gameService, _loggerMock.Object);
     }
 
     [Fact]

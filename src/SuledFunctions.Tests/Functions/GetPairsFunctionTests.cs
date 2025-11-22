@@ -24,7 +24,7 @@ public class GetPairsFunctionTests
     {
         _loggerMock = new Mock<ILogger<GetPairsFunction>>();
         var pairService = new PairService(); // Use real service instead of mock
-        _function = new GetPairsFunction(_loggerMock.Object, pairService);
+        _function = new GetPairsFunction(pairService, _loggerMock.Object);
     }
 
     [Fact]

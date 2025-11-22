@@ -37,7 +37,7 @@ public class TournamentServiceTests
         _cosmosClientMock.Setup(c => c.GetContainer("TestDb", "TestContainer"))
             .Returns(_containerMock.Object);
         
-        _service = new TournamentService(_loggerMock.Object, _cosmosClientMock.Object);
+        _service = new TournamentService(_cosmosClientMock.Object, _loggerMock.Object);
     }
 
     [Fact]
