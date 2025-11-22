@@ -84,7 +84,10 @@ public class ExcelParserService : IExcelParserService
                 tournament.Name = parts[0];
                 
                 // Try to parse date from second part
-                if (DateTime.TryParse(parts[1], out var startDate))
+                if (DateTime.TryParseExact(parts[1], "dd'-'MM'-'yyyy",
+						   CultureInfo.InvariantCulture,
+						   DateTimeStyles.None,
+						   out var startDate))
                 {
                     tournament.StartDate = startDate;
                 }
@@ -123,8 +126,8 @@ public class ExcelParserService : IExcelParserService
             // Look for metadata in first few rows
             for (int row = 1; row <= Math.Min(5, worksheet.Dimension.End.Row); row++)
             {
-                var labelCell = worksheet.Cells[row, 1].Text.Trim();
-                var valueCell = worksheet.Cells[row, 2].Text.Trim();
+                var labelCell = worksheet.Cells[row, 10].Text.Trim();
+                var valueCell = worksheet.Cells[row, 11].Text.Trim();
                 
                 if (string.IsNullOrWhiteSpace(labelCell)) continue;
                 
