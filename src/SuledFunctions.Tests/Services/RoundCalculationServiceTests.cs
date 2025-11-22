@@ -55,9 +55,9 @@ public class RoundCalculationServiceTests
         result.Should().HaveCount(1);
         result[0].RoundNumber.Should().Be(1);
         result[0].GameCount.Should().Be(4);
-        result[0].StartTime.Should().Be(new DateTime(2025, 11, 22, 9, 0, 0));
+        result[0].StartTime.Should().Be(new TimeOnly(9, 0, 0));
         // 4 games / 2 courts = 2 games per court × 15 min = 30 minutes
-        result[0].EndTime.Should().Be(new DateTime(2025, 11, 22, 9, 30, 0));
+        result[0].EndTime.Should().Be(new TimeOnly(9, 30, 0));
     }
 
     [Fact]
@@ -80,20 +80,20 @@ public class RoundCalculationServiceTests
         
         // Round 1: 9:00 - 9:30 (4 games / 2 courts = 30 min)
         result[0].RoundNumber.Should().Be(1);
-        result[0].StartTime.Should().Be(new DateTime(2025, 11, 22, 9, 0, 0));
-        result[0].EndTime.Should().Be(new DateTime(2025, 11, 22, 9, 30, 0));
+        result[0].StartTime.Should().Be(new TimeOnly(9, 0, 0));
+        result[0].EndTime.Should().Be(new TimeOnly(9, 30, 0));
         result[0].GameCount.Should().Be(4);
         
         // Round 2: 9:35 - 10:05 (5 min break + 30 min)
         result[1].RoundNumber.Should().Be(2);
-        result[1].StartTime.Should().Be(new DateTime(2025, 11, 22, 9, 35, 0));
-        result[1].EndTime.Should().Be(new DateTime(2025, 11, 22, 10, 5, 0));
+        result[1].StartTime.Should().Be(new TimeOnly(9, 35, 0));
+        result[1].EndTime.Should().Be(new TimeOnly(10, 5, 0));
         result[1].GameCount.Should().Be(4);
         
         // Round 3: 10:10 - 10:25 (5 min break + 15 min)
         result[2].RoundNumber.Should().Be(3);
-        result[2].StartTime.Should().Be(new DateTime(2025, 11, 22, 10, 10, 0));
-        result[2].EndTime.Should().Be(new DateTime(2025, 11, 22, 10, 25, 0));
+        result[2].StartTime.Should().Be(new TimeOnly(10, 10, 0));
+        result[2].EndTime.Should().Be(new TimeOnly(10, 25, 0));
         result[2].GameCount.Should().Be(2);
     }
 
@@ -116,8 +116,8 @@ public class RoundCalculationServiceTests
         result.Should().HaveCount(1);
         result[0].GameCount.Should().Be(3);
         // 3 games / 1 court = 3 games sequentially × 15 min = 45 minutes
-        result[0].StartTime.Should().Be(new DateTime(2025, 11, 22, 10, 0, 0));
-        result[0].EndTime.Should().Be(new DateTime(2025, 11, 22, 10, 45, 0));
+        result[0].StartTime.Should().Be(new TimeOnly(10, 0, 0));
+        result[0].EndTime.Should().Be(new TimeOnly(10, 45, 0));
     }
 
     [Fact]
@@ -139,8 +139,8 @@ public class RoundCalculationServiceTests
         result.Should().HaveCount(1);
         result[0].GameCount.Should().Be(6);
         // 6 games / 6 courts = 1 game per court × 15 min = 15 minutes
-        result[0].StartTime.Should().Be(new DateTime(2025, 11, 22, 10, 0, 0));
-        result[0].EndTime.Should().Be(new DateTime(2025, 11, 22, 10, 15, 0));
+        result[0].StartTime.Should().Be(new TimeOnly(10, 0, 0));
+        result[0].EndTime.Should().Be(new TimeOnly(10, 15, 0));
     }
 
     [Fact]
@@ -160,8 +160,8 @@ public class RoundCalculationServiceTests
 
         // Assert
         result.Should().HaveCount(1);
-        result[0].StartTime.Date.Should().BeCloseTo(DateTime.UtcNow.Date, TimeSpan.FromDays(1));
-        result[0].StartTime.TimeOfDay.Should().Be(new TimeSpan(9, 0, 0)); // Default start time
+        result[0].StartTime.Hour.Should().Be(9);
+        result[0].StartTime.Minute.Should().Be(0); // Default start time
     }
 
     [Fact]
@@ -182,7 +182,7 @@ public class RoundCalculationServiceTests
 
         // Assert
         result.Should().HaveCount(1);
-        result[0].StartTime.Should().Be(new DateTime(2025, 11, 25, 14, 30, 0));
+        result[0].StartTime.Should().Be(new TimeOnly(14, 30, 0));
     }
 
     [Fact]
@@ -207,9 +207,9 @@ public class RoundCalculationServiceTests
         result[2].RoundNumber.Should().Be(5);
         
         // Each should still be calculated sequentially
-        result[0].StartTime.Should().Be(new DateTime(2025, 11, 22, 9, 0, 0));
-        result[1].StartTime.Should().Be(new DateTime(2025, 11, 22, 9, 35, 0));
-        result[2].StartTime.Should().Be(new DateTime(2025, 11, 22, 10, 10, 0));
+        result[0].StartTime.Should().Be(new TimeOnly(9, 0, 0));
+        result[1].StartTime.Should().Be(new TimeOnly(9, 35, 0));
+        result[2].StartTime.Should().Be(new TimeOnly(10, 10, 0));
     }
 
     [Fact]
@@ -232,12 +232,12 @@ public class RoundCalculationServiceTests
         
         // Round 1: 5 games / 2 courts = 3 games per court (ceiling) × 15 min = 45 min
         result[0].GameCount.Should().Be(5);
-        result[0].EndTime.Should().Be(new DateTime(2025, 11, 22, 9, 45, 0));
+        result[0].EndTime.Should().Be(new TimeOnly(9, 45, 0));
         
         // Round 2: 1 game / 2 courts = 1 game per court × 15 min = 15 min
         result[1].GameCount.Should().Be(1);
-        result[1].StartTime.Should().Be(new DateTime(2025, 11, 22, 9, 50, 0));
-        result[1].EndTime.Should().Be(new DateTime(2025, 11, 22, 10, 5, 0));
+        result[1].StartTime.Should().Be(new TimeOnly(9, 50, 0));
+        result[1].EndTime.Should().Be(new TimeOnly(10, 5, 0));
     }
 
     [Fact]

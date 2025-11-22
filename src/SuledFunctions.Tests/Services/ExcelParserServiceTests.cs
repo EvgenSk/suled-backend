@@ -385,7 +385,7 @@ public class ExcelParserServiceTests : IDisposable
         
         result.Rounds[0].RoundNumber.Should().Be(1);
         result.Rounds[0].GameCount.Should().Be(2);
-        result.Rounds[0].StartTime.Should().Be(new DateTime(2025, 11, 22, 9, 0, 0));
+        result.Rounds[0].StartTime.Should().Be(new TimeOnly(9, 0, 0));
         
         result.Rounds[1].RoundNumber.Should().Be(2);
         result.Rounds[1].GameCount.Should().Be(2);

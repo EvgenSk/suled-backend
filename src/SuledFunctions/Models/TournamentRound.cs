@@ -6,7 +6,7 @@ namespace SuledFunctions.Models;
 public record TournamentRound
 {
     public int RoundNumber { get; set; }
-    public DateTime StartTime { get; set; }
-    public DateTime EndTime { get; set; }
+    public TimeOnly StartTime { get; set; }
+    public TimeOnly EndTime { get; set; }
     public int GameCount { get; set; }
 }

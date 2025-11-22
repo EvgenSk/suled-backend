@@ -77,8 +77,8 @@ public class RoundCalculationService : IRoundCalculationService
             rounds.Add(new TournamentRound
             {
                 RoundNumber = roundNumber,
-                StartTime = roundStart,
-                EndTime = roundEnd,
+                StartTime = TimeOnly.FromDateTime(roundStart),
+                EndTime = TimeOnly.FromDateTime(roundEnd),
                 GameCount = uniqueGameCount
             });
 

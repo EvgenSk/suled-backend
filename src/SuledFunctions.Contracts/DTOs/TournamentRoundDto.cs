@@ -11,10 +11,10 @@ public record TournamentRoundDto
     public int RoundNumber { get; init; }
     
     [JsonPropertyName("startTime")]
-    public DateTime StartTime { get; init; }
+    public TimeOnly StartTime { get; init; }
     
     [JsonPropertyName("endTime")]
-    public DateTime EndTime { get; init; }
+    public TimeOnly EndTime { get; init; }
     
     [JsonPropertyName("gameCount")]
     public int GameCount { get; init; }

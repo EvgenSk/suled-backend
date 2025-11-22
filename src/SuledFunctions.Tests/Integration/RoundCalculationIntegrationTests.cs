@@ -104,15 +104,15 @@ public class RoundCalculationIntegrationTests : IDisposable
         // Round 1: 4 games / 2 courts = 2 per court = 30 minutes
         tournament.Rounds[0].RoundNumber.Should().Be(1);
         tournament.Rounds[0].GameCount.Should().Be(4);
-        var round1Duration = tournament.Rounds[0].EndTime - tournament.Rounds[0].StartTime;
+        var round1Duration = tournament.Rounds[0].EndTime.ToTimeSpan() - tournament.Rounds[0].StartTime.ToTimeSpan();
         round1Duration.Should().Be(TimeSpan.FromMinutes(30));
         
         // Round 2 should start 5 minutes after Round 1 ends
-        var breakDuration = tournament.Rounds[1].StartTime - tournament.Rounds[0].EndTime;
+        var breakDuration = tournament.Rounds[1].StartTime.ToTimeSpan() - tournament.Rounds[0].EndTime.ToTimeSpan();
         breakDuration.Should().Be(TimeSpan.FromMinutes(5));
         
         // Round 3 should also have proper break
-        var break2Duration = tournament.Rounds[2].StartTime - tournament.Rounds[1].EndTime;
+        var break2Duration = tournament.Rounds[2].StartTime.ToTimeSpan() - tournament.Rounds[1].EndTime.ToTimeSpan();
         break2Duration.Should().Be(TimeSpan.FromMinutes(5));
     }
 
@@ -131,11 +131,11 @@ public class RoundCalculationIntegrationTests : IDisposable
 
         // Assert
         // With 1 court: 4 games sequential = 60 minutes
-        var duration1Court = tournament1Court.Rounds[0].EndTime - tournament1Court.Rounds[0].StartTime;
+        var duration1Court = tournament1Court.Rounds[0].EndTime.ToTimeSpan() - tournament1Court.Rounds[0].StartTime.ToTimeSpan();
         duration1Court.Should().Be(TimeSpan.FromMinutes(60));
         
         // With 4 courts: 4 games parallel = 15 minutes
-        var duration4Courts = tournament4Courts.Rounds[0].EndTime - tournament4Courts.Rounds[0].StartTime;
+        var duration4Courts = tournament4Courts.Rounds[0].EndTime.ToTimeSpan() - tournament4Courts.Rounds[0].StartTime.ToTimeSpan();
         duration4Courts.Should().Be(TimeSpan.FromMinutes(15));
     }
 
@@ -151,7 +151,8 @@ public class RoundCalculationIntegrationTests : IDisposable
 
         // Assert
         tournament.Rounds.Should().NotBeEmpty();
-        tournament.Rounds[0].StartTime.TimeOfDay.Should().Be(new TimeSpan(9, 0, 0)); // Default start time
+        tournament.Rounds[0].StartTime.Hour.Should().Be(9);
+        tournament.Rounds[0].StartTime.Minute.Should().Be(0); // Default start time
     }
 
     private ExcelParserService CreateParserService()
