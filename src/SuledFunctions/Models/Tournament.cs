@@ -17,9 +17,12 @@ public record Tournament
     // Tournament metadata
     public DateTime? StartDate { get; set; }
     public DateTime? EndDate { get; set; }
+    public TimeSpan? StartTime { get; set; }
+    public TimeSpan? EndTime { get; set; }
     public string Location { get; set; } = string.Empty;
     public string Division { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
+    public string Rules { get; set; } = string.Empty;
     public TournamentStatus Status { get; set; } = TournamentStatus.Upcoming;
     
     // Pair-centered: Tournament contains pairs, each with their games

@@ -112,19 +112,22 @@ public class ExcelParserService : IExcelParserService
     }
     
     /// <summary>
-    /// Try to extract metadata from Excel cells (e.g., first few rows before game data)
+    /// Try to extract metadata from Excel cells
     /// Expected format (optional):
     /// Row 1: Tournament Name: [value]
     /// Row 2: Location: [value]
     /// Row 3: Date: [value]
     /// Row 4: Division: [value]
+    /// Row 5: Start Time: [value]
+    /// Row 6: End Time: [value]
+    /// Row 7: Rules: [value]
     /// </summary>
     private void ExtractMetadataFromExcel(Tournament tournament, ExcelWorksheet worksheet)
     {
         try
         {
-            // Look for metadata in first few rows
-            for (int row = 1; row <= Math.Min(5, worksheet.Dimension.End.Row); row++)
+            // Look for metadata in first few rows (increased to 10 to accommodate more fields)
+            for (int row = 1; row <= Math.Min(10, worksheet.Dimension.End.Row); row++)
             {
                 var labelCell = worksheet.Cells[row, 10].Text.Trim();
                 var valueCell = worksheet.Cells[row, 11].Text.Trim();
@@ -143,14 +146,25 @@ public class ExcelParserService : IExcelParserService
                     if (!string.IsNullOrWhiteSpace(valueCell))
                         tournament.Location = valueCell;
                 }
-                else if (labelCell.Contains("Date", StringComparison.OrdinalIgnoreCase) ||
-                         labelCell.Contains("Start", StringComparison.OrdinalIgnoreCase))
+                else if (labelCell.Contains("Date", StringComparison.OrdinalIgnoreCase))
                 {
                     if (DateTime.TryParseExact(valueCell, "dd'.'MM'.'yyyy",
-						   CultureInfo.InvariantCulture,
-						   DateTimeStyles.None,
-						   out var date))
-						tournament.StartDate = date;
+					   CultureInfo.InvariantCulture,
+					   DateTimeStyles.None,
+					   out var date))
+					tournament.StartDate = date;
+                }
+                else if (labelCell.Contains("Start Time", StringComparison.OrdinalIgnoreCase) ||
+                         labelCell.Contains("Begin Time", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (TimeSpan.TryParse(valueCell, out var startTime))
+                        tournament.StartTime = startTime;
+                }
+                else if (labelCell.Contains("End Time", StringComparison.OrdinalIgnoreCase) ||
+                         labelCell.Contains("Finish Time", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (TimeSpan.TryParse(valueCell, out var endTime))
+                        tournament.EndTime = endTime;
                 }
                 else if (labelCell.Contains("Division", StringComparison.OrdinalIgnoreCase) ||
                          labelCell.Contains("Category", StringComparison.OrdinalIgnoreCase))
@@ -162,6 +176,12 @@ public class ExcelParserService : IExcelParserService
                 {
                     if (!string.IsNullOrWhiteSpace(valueCell))
                         tournament.Description = valueCell;
+                }
+                else if (labelCell.Contains("Rules", StringComparison.OrdinalIgnoreCase) ||
+                         labelCell.Contains("Rule", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!string.IsNullOrWhiteSpace(valueCell))
+                        tournament.Rules = valueCell;
                 }
             }
         }
