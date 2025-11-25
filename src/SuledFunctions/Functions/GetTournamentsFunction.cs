@@ -91,6 +91,7 @@ public class GetTournamentsFunction
                 Location = t.Location,
                 Division = t.Division,
                 Description = t.Description,
+                Warmup = t.Warmup,
                 Status = t.Status.ToString(),
                 GameCount = t.Games?.Count ?? 0,
                 CreatedDate = t.CreatedDate,

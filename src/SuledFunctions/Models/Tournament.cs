@@ -23,6 +23,8 @@ public record Tournament
     public string Division { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public string Rules { get; set; } = string.Empty;
+
+    public TimeSpan? Warmup { get; set; }
     public TournamentStatus Status { get; set; } = TournamentStatus.Upcoming;
     
     // Round scheduling information

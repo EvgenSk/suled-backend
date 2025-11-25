@@ -48,7 +48,9 @@ public class RoundCalculationService : IRoundCalculationService
         var tournamentStartTime = tournament.StartTime ?? DefaultStartTime;
         var tournamentEndTime = tournament.EndTime ?? DefaultEndTime;
         
-        var currentTime = tournamentStartDate.Add(tournamentStartTime);
+        // Apply warmup time - games start after warmup period
+        var warmupDuration = tournament.Warmup ?? TimeSpan.Zero;
+        var currentTime = tournamentStartDate.Add(tournamentStartTime).Add(warmupDuration);
         var rounds = new List<TournamentRound>();
 
         foreach (var roundNumber in roundNumbers)

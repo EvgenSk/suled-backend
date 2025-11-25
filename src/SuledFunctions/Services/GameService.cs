@@ -14,7 +14,7 @@ public class GameService : IGameService
     /// </summary>
     /// <param name="tournaments">Collection of tournaments to search</param>
     /// <param name="pairId">The ID of the pair to find games for</param>
-    /// <returns>List of games involving the specified pair</returns>
+    /// <returns>List of games involving the spminsecified pair</returns>
     public IEnumerable<GameDto> GetGamesForPair(IEnumerable<Tournament> tournaments, string pairId)
     {
         if (tournaments == null || string.IsNullOrEmpty(pairId))

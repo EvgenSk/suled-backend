@@ -241,6 +241,116 @@ public class RoundCalculationServiceTests
     }
 
     [Fact]
+    public void CalculateRounds_WithWarmup_AddsWarmupTimeToStartTime()
+    {
+        // Arrange
+        var warmupDuration = new TimeSpan(0, 5, 0); // 5 minutes warmup
+        var tournament = CreateTournamentWithGames(
+            startDate: new DateTime(2025, 11, 22),
+            startTime: new TimeSpan(9, 0, 0),
+            rounds: new[] { 1 },
+            gamesPerRound: new[] { 2 },
+            courts: 1
+        );
+        tournament.Warmup = warmupDuration;
+
+        // Act
+        var result = _service.CalculateRounds(tournament);
+
+        // Assert
+        result.Should().HaveCount(1);
+        // Start time should be 9:00 + 5 min warmup = 9:05
+        result[0].StartTime.Should().Be(new TimeOnly(9, 5, 0));
+        // End time: 9:05 + 30 min (2 games × 15 min) = 9:35
+        result[0].EndTime.Should().Be(new TimeOnly(9, 35, 0));
+    }
+
+    [Fact]
+    public void CalculateRounds_WithWarmup_AffectsAllRounds()
+    {
+        // Arrange
+        var warmupDuration = new TimeSpan(0, 10, 0); // 10 minutes warmup
+        var tournament = CreateTournamentWithGames(
+            startDate: new DateTime(2025, 11, 22),
+            startTime: new TimeSpan(9, 0, 0),
+            rounds: new[] { 1, 2, 3 },
+            gamesPerRound: new[] { 2, 2, 2 },
+            courts: 1
+        );
+        tournament.Warmup = warmupDuration;
+
+        // Act
+        var result = _service.CalculateRounds(tournament);
+
+        // Assert
+        result.Should().HaveCount(3);
+        
+        // Round 1: starts at 9:10 (9:00 + 10 min warmup)
+        result[0].StartTime.Should().Be(new TimeOnly(9, 10, 0));
+        result[0].EndTime.Should().Be(new TimeOnly(9, 40, 0));
+        
+        // Round 2: starts at 9:45 (9:40 + 5 min break)
+        result[1].StartTime.Should().Be(new TimeOnly(9, 45, 0));
+        result[1].EndTime.Should().Be(new TimeOnly(10, 15, 0));
+        
+        // Round 3: starts at 10:20 (10:15 + 5 min break)
+        result[2].StartTime.Should().Be(new TimeOnly(10, 20, 0));
+        result[2].EndTime.Should().Be(new TimeOnly(10, 50, 0));
+    }
+
+    [Fact]
+    public void CalculateRounds_WithNoWarmup_DoesNotAffectStartTime()
+    {
+        // Arrange
+        var tournament = CreateTournamentWithGames(
+            startDate: new DateTime(2025, 11, 22),
+            startTime: new TimeSpan(9, 0, 0),
+            rounds: new[] { 1 },
+            gamesPerRound: new[] { 2 },
+            courts: 1
+        );
+        tournament.Warmup = null; // No warmup
+
+        // Act
+        var result = _service.CalculateRounds(tournament);
+
+        // Assert
+        result.Should().HaveCount(1);
+        // Start time should be exactly 9:00 with no warmup
+        result[0].StartTime.Should().Be(new TimeOnly(9, 0, 0));
+        result[0].EndTime.Should().Be(new TimeOnly(9, 30, 0));
+    }
+
+    [Fact]
+    public void CalculateRounds_WithShortWarmup_CalculatesCorrectly()
+    {
+        // Arrange
+        var warmupDuration = new TimeSpan(0, 2, 30); // 2 minutes 30 seconds
+        var tournament = CreateTournamentWithGames(
+            startDate: new DateTime(2025, 11, 22),
+            startTime: new TimeSpan(10, 30, 0),
+            rounds: new[] { 1, 2 },
+            gamesPerRound: new[] { 4, 2 },
+            courts: 2
+        );
+        tournament.Warmup = warmupDuration;
+
+        // Act
+        var result = _service.CalculateRounds(tournament);
+
+        // Assert
+        result.Should().HaveCount(2);
+        
+        // Round 1: starts at 10:32:30 (10:30 + 2:30 warmup)
+        result[0].StartTime.Should().Be(new TimeOnly(10, 32, 30));
+        // 4 games / 2 courts = 30 minutes, so ends at 11:02:30
+        result[0].EndTime.Should().Be(new TimeOnly(11, 2, 30));
+        
+        // Round 2: starts at 11:07:30 (11:02:30 + 5 min break)
+        result[1].StartTime.Should().Be(new TimeOnly(11, 7, 30));
+    }
+
+    [Fact]
     public void CalculateRounds_LogsInformation()
     {
         // Arrange

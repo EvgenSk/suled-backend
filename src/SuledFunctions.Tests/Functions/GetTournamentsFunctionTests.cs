@@ -252,6 +252,61 @@ public class GetTournamentsFunctionTests
     }
 
     [Fact]
+    public async Task Run_MapsWarmupPropertyInResponse()
+    {
+        // Arrange
+        var tournaments = new List<Tournament>
+        {
+            new Tournament
+            {
+                Id = "t1",
+                Name = "Tournament with Warmup",
+                Location = "Test City",
+                Division = "Pro",
+                StartDate = new DateTime(2025, 1, 15),
+                Warmup = new TimeSpan(0, 5, 0), // 5 minutes warmup
+                Status = TournamentStatus.Upcoming,
+                Games = new List<Game>()
+            },
+            new Tournament
+            {
+                Id = "t2",
+                Name = "Tournament without Warmup",
+                Location = "Test City",
+                Division = "Amateur",
+                StartDate = new DateTime(2025, 2, 15),
+                Warmup = null,
+                Status = TournamentStatus.Upcoming,
+                Games = new List<Game>()
+            }
+        };
+        
+        _tournamentServiceMock.Setup(s => s.GetTournamentsAsync(
+            null, null, null, null, null, 100))
+            .ReturnsAsync(tournaments);
+
+        var requestMock = CreateMockRequest();
+
+        // Act
+        var response = await _function.Run(requestMock.Object);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var content = await GetResponseContent(response);
+        var tournamentsArray = content!.RootElement;
+        
+        // First tournament with warmup
+        var firstTournament = tournamentsArray[0];
+        firstTournament.TryGetProperty("warmup", out var warmupProp).Should().BeTrue();
+        warmupProp.GetString().Should().Be("00:05:00");
+        
+        // Second tournament without warmup (should have null or not present)
+        var secondTournament = tournamentsArray[1];
+        secondTournament.TryGetProperty("warmup", out var warmupProp2).Should().BeTrue();
+        warmupProp2.ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
     public async Task Run_WithInvalidDateFormat_IgnoresInvalidDate()
     {
         // Arrange

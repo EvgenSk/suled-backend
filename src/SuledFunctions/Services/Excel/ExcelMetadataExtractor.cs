@@ -146,12 +146,24 @@ public class ExcelMetadataExtractor : IExcelMetadataExtractor
             if (!string.IsNullOrWhiteSpace(value))
                 tournament.Rules = value;
         }
-    }
-    
-    /// <summary>
-    /// Determine tournament status based on dates
-    /// </summary>
-    public void DetermineStatus(Tournament tournament)
+		else if (label.Contains("Warmup", StringComparison.OrdinalIgnoreCase))
+		{
+			if (!string.IsNullOrWhiteSpace(value))
+			{
+				// Extract numeric value from string (handles "5", "5 mins", "10 minutes", etc.)
+				var numericValue = new string([.. value.Where(char.IsDigit)]);
+				if (!string.IsNullOrWhiteSpace(numericValue) && int.TryParse(numericValue, out var minutes))
+				{
+					tournament.Warmup = TimeSpan.FromMinutes(minutes);
+				}
+			}
+		}
+	}
+
+	/// <summary>
+	/// Determine tournament status based on dates
+	/// </summary>
+	public void DetermineStatus(Tournament tournament)
     {
         if (!tournament.StartDate.HasValue)
         {
