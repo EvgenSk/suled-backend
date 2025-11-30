@@ -279,8 +279,7 @@ public class GetTournamentsFunctionTests
                 Division = "Pro",
                 StartDate = new DateTime(2025, 1, 15),
                 Warmup = new TimeSpan(0, 5, 0), // 5 minutes warmup
-                Status = TournamentStatus.Upcoming,
-                Games = new List<Game>()
+                Status = TournamentStatus.Upcoming
             },
             new Tournament
             {
@@ -290,8 +289,7 @@ public class GetTournamentsFunctionTests
                 Division = "Amateur",
                 StartDate = new DateTime(2025, 2, 15),
                 Warmup = null,
-                Status = TournamentStatus.Upcoming,
-                Games = new List<Game>()
+                Status = TournamentStatus.Upcoming
             }
         };
         
@@ -513,8 +511,7 @@ public class GetTournamentsFunctionTests
                 Division = "Pro",
                 StartDate = new DateTime(2025, 1, 15),
                 EndDate = new DateTime(2025, 1, 17),
-                Status = TournamentStatus.InProgress,
-                Games = new List<Game> { new Game(), new Game() }
+                Status = TournamentStatus.InProgress
             },
             new Tournament
             {
@@ -524,8 +521,7 @@ public class GetTournamentsFunctionTests
                 Division = "Amateur",
                 StartDate = new DateTime(2025, 2, 15),
                 EndDate = new DateTime(2025, 2, 17),
-                Status = TournamentStatus.Upcoming,
-                Games = new List<Game> { new Game() }
+                Status = TournamentStatus.Upcoming
             },
             new Tournament
             {
@@ -535,8 +531,7 @@ public class GetTournamentsFunctionTests
                 Division = "Open",
                 StartDate = new DateTime(2025, 3, 15),
                 EndDate = new DateTime(2025, 3, 17),
-                Status = TournamentStatus.Completed,
-                Games = new List<Game> { new Game(), new Game(), new Game() }
+                Status = TournamentStatus.Completed
             }
         };
     }

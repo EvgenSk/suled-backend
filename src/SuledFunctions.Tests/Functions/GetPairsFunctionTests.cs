@@ -205,8 +205,7 @@ public class GetPairsFunctionTests
         var tournament = new Tournament
         {
             Id = "test-1",
-            Name = "Test Tournament",
-            Games = new List<Game>() // Empty games list
+            Name = "Test Tournament"
         };
         var requestMock = CreateMockRequest();
 

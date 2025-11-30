@@ -43,8 +43,7 @@ public class CosmosDbLocalIntegrationTests : IAsyncLifetime
         {
             Id = Guid.NewGuid().ToString(),
             Name = "Test Tournament",
-            BlobFileName = "test.xlsx",
-            Games = new List<Game>()
+            BlobFileName = "test.xlsx"
         };
 
         // Act
@@ -64,8 +63,7 @@ public class CosmosDbLocalIntegrationTests : IAsyncLifetime
         {
             Id = Guid.NewGuid().ToString(),
             Name = "Read Test Tournament",
-            BlobFileName = "read-test.xlsx",
-            Games = new List<Game>()
+            BlobFileName = "read-test.xlsx"
         };
         await _container.CreateItemAsync(tournament, new PartitionKey(tournament.Id));
 
@@ -84,9 +82,9 @@ public class CosmosDbLocalIntegrationTests : IAsyncLifetime
         // Arrange
         var tournaments = new[]
         {
-            new Tournament { Id = Guid.NewGuid().ToString(), Name = "Tournament A", BlobFileName = "a.xlsx", Games = new List<Game>() },
-            new Tournament { Id = Guid.NewGuid().ToString(), Name = "Tournament B", BlobFileName = "b.xlsx", Games = new List<Game>() },
-            new Tournament { Id = Guid.NewGuid().ToString(), Name = "Tournament C", BlobFileName = "c.xlsx", Games = new List<Game>() }
+            new Tournament { Id = Guid.NewGuid().ToString(), Name = "Tournament A", BlobFileName = "a.xlsx" },
+            new Tournament { Id = Guid.NewGuid().ToString(), Name = "Tournament B", BlobFileName = "b.xlsx" },
+            new Tournament { Id = Guid.NewGuid().ToString(), Name = "Tournament C", BlobFileName = "c.xlsx" }
         };
 
         foreach (var tournament in tournaments)
@@ -120,8 +118,7 @@ public class CosmosDbLocalIntegrationTests : IAsyncLifetime
         {
             Id = Guid.NewGuid().ToString(),
             Name = "Original Name",
-            BlobFileName = "original.xlsx",
-            Games = new List<Game>()
+            BlobFileName = "original.xlsx"
         };
         await _container.CreateItemAsync(tournament, new PartitionKey(tournament.Id));
 
@@ -142,8 +139,7 @@ public class CosmosDbLocalIntegrationTests : IAsyncLifetime
         {
             Id = Guid.NewGuid().ToString(),
             Name = "To Delete",
-            BlobFileName = "delete.xlsx",
-            Games = new List<Game>()
+            BlobFileName = "delete.xlsx"
         };
         await _container.CreateItemAsync(tournament, new PartitionKey(tournament.Id));
 
@@ -169,12 +165,7 @@ public class CosmosDbLocalIntegrationTests : IAsyncLifetime
         {
             Id = Guid.NewGuid().ToString(),
             Name = "Tournament with Games",
-            BlobFileName = "games.xlsx",
-            Games = new List<Game>
-            {
-                new Game { Id = "g1", Pair1 = pair1, Pair2 = pair2, Round = 1, CourtNumber = 1, Status = GameStatus.Scheduled },
-                new Game { Id = "g2", Pair1 = pair1, Pair2 = pair2, Round = 1, CourtNumber = 2, Status = GameStatus.Scheduled }
-            }
+            BlobFileName = "games.xlsx"
         };
 
         // Act
@@ -182,9 +173,7 @@ public class CosmosDbLocalIntegrationTests : IAsyncLifetime
 
         // Assert
         var retrieved = await _container.ReadItemAsync<Tournament>(tournament.Id, new PartitionKey(tournament.Id));
-        retrieved.Resource.Games.Should().HaveCount(2);
-        retrieved.Resource.Games[0].Round.Should().Be(1);
-        retrieved.Resource.Games[0].Status.Should().Be(GameStatus.Scheduled);
+        retrieved.Resource.Should().NotBeNull();
     }
 
     [Fact]
@@ -196,8 +185,7 @@ public class CosmosDbLocalIntegrationTests : IAsyncLifetime
         {
             Id = tournamentId,
             Name = "Partition Key Test",
-            BlobFileName = "pk-test.xlsx",
-            Games = new List<Game>()
+            BlobFileName = "pk-test.xlsx"
         };
         await _container.CreateItemAsync(tournament, new PartitionKey(tournamentId));
 
@@ -234,8 +222,7 @@ public class CosmosDbLocalIntegrationTests : IAsyncLifetime
             EndDate = new DateTime(2025, 12, 3),
             Location = "Test Arena",
             Division = "Mixed Open",
-            Status = TournamentStatus.Upcoming,
-            Games = new List<Game>()
+            Status = TournamentStatus.Upcoming
         };
 
         // Act
@@ -259,8 +246,7 @@ public class CosmosDbLocalIntegrationTests : IAsyncLifetime
             {
                 Id = Guid.NewGuid().ToString(),
                 Name = $"Bulk Tournament {i}",
-                BlobFileName = $"bulk-{i}.xlsx",
-                Games = new List<Game>()
+                BlobFileName = $"bulk-{i}.xlsx"
             })
             .ToList();
 

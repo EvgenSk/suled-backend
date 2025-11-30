@@ -330,30 +330,7 @@ public class UploadTournamentFunctionTests
         {
             Id = "test-tournament-1",
             Name = "Test Tournament",
-            BlobFileName = "test.xlsx",
-            Games = new List<Game>
-            {
-                new Game
-                {
-                    Id = "g1",
-                    TournamentId = "test-tournament-1",
-                    Pair1 = pair1,
-                    Pair2 = pair2,
-                    Round = 1,
-                    CourtNumber = 1,
-                    Status = GameStatus.Scheduled
-                },
-                new Game
-                {
-                    Id = "g2",
-                    TournamentId = "test-tournament-1",
-                    Pair1 = pair1,
-                    Pair2 = pair2,
-                    Round = 1,
-                    CourtNumber = 2,
-                    Status = GameStatus.Scheduled
-                }
-            }
+            BlobFileName = "test.xlsx"
         };
     }
 }

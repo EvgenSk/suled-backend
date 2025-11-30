@@ -155,7 +155,7 @@ public class PairServiceTests
         var pair2 = CreatePair("Bob", "Builder", "Alice", "Wonder");
         var tournaments = new[]
         {
-            new Tournament { Id = "t1", Name = "Test", Games = null! },
+            new Tournament { Id = "t1", Name = "Test" },
             CreateTournament("t2", pair1, pair2)
         };
 

@@ -400,8 +400,7 @@ public class TournamentServiceIntegrationTests : IAsyncLifetime
             EndDate = startDate?.AddDays(2),
             Location = location ?? "Test Location",
             Division = division ?? "Mixed Open",
-            Status = status,
-            Games = new List<Game>()
+            Status = status
         };
     }
 
