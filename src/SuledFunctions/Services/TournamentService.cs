@@ -1,31 +1,31 @@
-using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using SuledFunctions.Configuration;
+using SuledFunctions.Exceptions;
 using SuledFunctions.Models;
 using SuledFunctions.Models.Optimized;
+using SuledFunctions.Repositories;
 using SuledFunctions.Services.Interfaces;
 
 namespace SuledFunctions.Services;
 
 /// <summary>
-/// Service for managing tournaments in Cosmos DB
+/// Service for managing tournaments with business logic
 /// </summary>
 public class TournamentService : ITournamentService
 {
-    private readonly CosmosClient _cosmosClient;
-    private readonly string _databaseName;
-    private readonly string _containerName;
+    private readonly ITournamentRepository _repository;
     private readonly ILogger<TournamentService> _logger;
+    private readonly TournamentSettings _settings;
 
     public TournamentService(
-        CosmosClient cosmosClient,
+        ITournamentRepository repository,
+        IOptions<TournamentSettings> settings,
         ILogger<TournamentService> logger)
     {
-        _cosmosClient = cosmosClient;
+        _repository = repository;
         _logger = logger;
-        _databaseName = Environment.GetEnvironmentVariable("CosmosDbName") 
-            ?? throw new InvalidOperationException("CosmosDbName not configured");
-        _containerName = Environment.GetEnvironmentVariable("CosmosContainerName") 
-            ?? throw new InvalidOperationException("CosmosContainerName not configured");
+        _settings = settings.Value;
     }
 
     public async Task<List<Tournament>> GetTournamentsAsync(
@@ -38,67 +38,17 @@ public class TournamentService : ITournamentService
     {
         try
         {
-            var container = _cosmosClient.GetContainer(_databaseName, _containerName);
-            
-            // Build query with filters
-            var whereClauses = new List<string>();
-            
-            if (startDateFrom.HasValue)
+            var querySpec = new TournamentQuerySpec
             {
-                whereClauses.Add("c.startDate >= @startDateFrom");
-            }
-            
-            if (startDateTo.HasValue)
-            {
-                whereClauses.Add("c.startDate <= @startDateTo");
-            }
-            
-            if (!string.IsNullOrWhiteSpace(location))
-            {
-                whereClauses.Add("CONTAINS(c.location, @location, true)");
-            }
-            
-            if (!string.IsNullOrWhiteSpace(division))
-            {
-                whereClauses.Add("CONTAINS(c.division, @division, true)");
-            }
-            
-            if (status.HasValue)
-            {
-                whereClauses.Add("c.status = @status");
-            }
-            
-            // Build the complete query text (without ORDER BY to avoid issues with nullable fields)
-            var queryText = whereClauses.Any() 
-                ? $"SELECT * FROM c WHERE {string.Join(" AND ", whereClauses)}"
-                : "SELECT * FROM c";
-            
-            // Create query definition and add all parameters
-            var queryDefinition = new QueryDefinition(queryText);
-            
-            if (startDateFrom.HasValue)
-                queryDefinition = queryDefinition.WithParameter("@startDateFrom", startDateFrom.Value);
-            if (startDateTo.HasValue)
-                queryDefinition = queryDefinition.WithParameter("@startDateTo", startDateTo.Value);
-            if (!string.IsNullOrWhiteSpace(location))
-                queryDefinition = queryDefinition.WithParameter("@location", location);
-            if (!string.IsNullOrWhiteSpace(division))
-                queryDefinition = queryDefinition.WithParameter("@division", division);
-            if (status.HasValue)
-                queryDefinition = queryDefinition.WithParameter("@status", (int)status.Value);
+                StartDateFrom = startDateFrom,
+                StartDateTo = startDateTo,
+                Location = location,
+                Division = division,
+                Status = status,
+                MaxResults = maxResults > 0 ? maxResults : _settings.MaxResultsDefault
+            };
 
-            _logger.LogInformation("Executing query: {Query}", queryText);
-
-            var compactTournaments = new List<TournamentCompact>();
-            using var iterator = container.GetItemQueryIterator<TournamentCompact>(
-                queryDefinition,
-                requestOptions: new QueryRequestOptions { MaxItemCount = maxResults });
-
-            while (iterator.HasMoreResults && compactTournaments.Count < maxResults)
-            {
-                var response = await iterator.ReadNextAsync();
-                compactTournaments.AddRange(response);
-            }
+            var compactTournaments = await _repository.QueryAsync(querySpec);
 
             // Expand compact format to full Tournament models
             var tournaments = compactTournaments.Select(TournamentCompactMapper.FromCompact).ToList();
@@ -106,7 +56,7 @@ public class TournamentService : ITournamentService
             // Sort by StartDate in memory (descending - most recent first)
             var sortedTournaments = tournaments
                 .OrderByDescending(t => t.StartDate ?? DateTime.MinValue)
-                .Take(maxResults)
+                .Take(querySpec.MaxResults)
                 .ToList();
 
             _logger.LogInformation("Retrieved {Count} tournaments", sortedTournaments.Count);
@@ -123,14 +73,23 @@ public class TournamentService : ITournamentService
     {
         try
         {
-            var container = _cosmosClient.GetContainer(_databaseName, _containerName);
-            var response = await container.ReadItemAsync<TournamentCompact>(id, new PartitionKey(id));
-            return TournamentCompactMapper.FromCompact(response.Resource);
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                throw new ValidationException("id", "Tournament ID cannot be empty");
+            }
+
+            var compactTournament = await _repository.GetByIdAsync(id);
+            
+            if (compactTournament == null)
+            {
+                return null;
+            }
+
+            return TournamentCompactMapper.FromCompact(compactTournament);
         }
-        catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        catch (ValidationException)
         {
-            _logger.LogWarning("Tournament {TournamentId} not found", id);
-            return null;
+            throw;
         }
         catch (Exception ex)
         {

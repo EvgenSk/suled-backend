@@ -1,10 +1,13 @@
 using FluentAssertions;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
+using SuledFunctions.Configuration;
 using SuledFunctions.IntegrationTests.Infrastructure;
 using SuledFunctions.Models;
 using SuledFunctions.Models.Optimized;
+using SuledFunctions.Repositories;
 using SuledFunctions.Services;
 
 namespace SuledFunctions.IntegrationTests.CosmosDb;
@@ -19,6 +22,7 @@ public class TournamentServiceIntegrationTests : IAsyncLifetime
 {
     private readonly LocalCosmosDbFixture _fixture;
     private TournamentService _tournamentService = null!;
+    private TournamentRepository _tournamentRepository = null!;
     private Container _container = null!;
     private const string DatabaseName = "TournamentDb";
     private const string ContainerName = "Tournaments";
@@ -33,13 +37,25 @@ public class TournamentServiceIntegrationTests : IAsyncLifetime
         // Create test database and container
         _container = await _fixture.CreateContainerAsync(DatabaseName, ContainerName, "/id");
 
-        // Set environment variables for the service
-        Environment.SetEnvironmentVariable("CosmosDbName", DatabaseName);
-        Environment.SetEnvironmentVariable("CosmosContainerName", ContainerName);
+        // Create settings
+        var cosmosSettings = Options.Create(new CosmosDbSettings
+        {
+            ConnectionString = "not-used-directly",
+            DatabaseName = DatabaseName,
+            ContainerName = ContainerName
+        });
 
-        // Create service with real CosmosClient
-        var mockLogger = new Mock<ILogger<TournamentService>>();
-        _tournamentService = new TournamentService(_fixture.CosmosClient, mockLogger.Object);
+        var tournamentSettings = Options.Create(new TournamentSettings
+        {
+            MaxResultsDefault = 100
+        });
+
+        // Create repository and service with real CosmosClient
+        var mockRepoLogger = new Mock<ILogger<TournamentRepository>>();
+        var mockServiceLogger = new Mock<ILogger<TournamentService>>();
+        
+        _tournamentRepository = new TournamentRepository(_fixture.CosmosClient, cosmosSettings, mockRepoLogger.Object);
+        _tournamentService = new TournamentService(_tournamentRepository, tournamentSettings, mockServiceLogger.Object);
     }
 
     public async Task DisposeAsync()

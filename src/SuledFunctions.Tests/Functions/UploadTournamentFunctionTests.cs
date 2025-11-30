@@ -5,14 +5,16 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
+using SuledFunctions.Configuration;
 using SuledFunctions.Functions;
 using SuledFunctions.Models;
+using SuledFunctions.Models.Optimized;
+using SuledFunctions.Repositories;
 using SuledFunctions.Services.Interfaces;
 using SuledFunctions.Tests.Helpers;
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using Microsoft.Azure.Cosmos;
 
 namespace SuledFunctions.Tests.Functions;
 
@@ -20,31 +22,30 @@ public class UploadTournamentFunctionTests
 {
     private readonly Mock<ILogger<UploadTournamentFunction>> _loggerMock;
     private readonly Mock<IExcelParserService> _excelParserMock;
-    private readonly Mock<CosmosClient> _cosmosClientMock;
+    private readonly Mock<ITournamentRepository> _repositoryMock;
+    private readonly IOptions<TournamentSettings> _settings;
     private readonly UploadTournamentFunction _function;
 
     public UploadTournamentFunctionTests()
     {
         _loggerMock = new Mock<ILogger<UploadTournamentFunction>>();
         _excelParserMock = new Mock<IExcelParserService>();
-        _cosmosClientMock = new Mock<CosmosClient>();
-        _function = new UploadTournamentFunction(_excelParserMock.Object, _loggerMock.Object);
+        _repositoryMock = new Mock<ITournamentRepository>();
+        _settings = Options.Create(new TournamentSettings
+        {
+            RequestTimeoutSeconds = 30,
+            MaxUploadSizeBytes = 10 * 1024 * 1024
+        });
         
-        // Setup Cosmos DB mocks
-        Environment.SetEnvironmentVariable("CosmosDbName", "TestDb");
-        Environment.SetEnvironmentVariable("CosmosContainerName", "TestContainer");
+        _function = new UploadTournamentFunction(
+            _excelParserMock.Object, 
+            _repositoryMock.Object,
+            _settings,
+            _loggerMock.Object);
         
-        var databaseMock = new Mock<Database>();
-        var containerMock = new Mock<Container>();
-        var responseMock = new Mock<ItemResponse<Tournament>>();
-        
-        _cosmosClientMock.Setup(c => c.GetDatabase(It.IsAny<string>())).Returns(databaseMock.Object);
-        databaseMock.Setup(d => d.GetContainer(It.IsAny<string>())).Returns(containerMock.Object);
-        containerMock.Setup(c => c.CreateItemAsync(
-            It.IsAny<Tournament>(),
-            It.IsAny<PartitionKey>(),
-            It.IsAny<ItemRequestOptions>(),
-            It.IsAny<CancellationToken>())).ReturnsAsync(responseMock.Object);
+        // Setup repository mock to succeed by default
+        _repositoryMock.Setup(r => r.CreateAsync(It.IsAny<TournamentCompact>(), default))
+            .ReturnsAsync((TournamentCompact t, CancellationToken ct) => t);
     }
 
     [Fact]
@@ -59,7 +60,7 @@ public class UploadTournamentFunctionTests
         var requestMock = CreateMockMultipartRequest();
 
         // Act
-        var result = await _function.Run(requestMock.Object, _cosmosClientMock.Object);
+        var result = await _function.Run(requestMock.Object);
 
         // Assert
         result.Should().NotBeNull();
@@ -78,7 +79,7 @@ public class UploadTournamentFunctionTests
         var requestMock = CreateMockMultipartRequest();
 
         // Act
-        await _function.Run(requestMock.Object, _cosmosClientMock.Object);
+        await _function.Run(requestMock.Object);
 
         // Assert
         _excelParserMock.Verify(
@@ -98,7 +99,7 @@ public class UploadTournamentFunctionTests
         var requestMock = CreateMockMultipartRequest();
 
         // Act
-        var result = await _function.Run(requestMock.Object, _cosmosClientMock.Object);
+        var result = await _function.Run(requestMock.Object);
 
         // Assert
         var content = await GetResponseContent(result);
@@ -110,7 +111,7 @@ public class UploadTournamentFunctionTests
     }
 
     [Fact]
-    public async Task Run_WithNonMultipartRequest_ReturnsBadRequest()
+    public async Task Run_WithNonMultipartRequest_ThrowsValidationException()
     {
         // Arrange
         var requestMock = CreateMockRequest();
@@ -119,33 +120,23 @@ public class UploadTournamentFunctionTests
         requestMock.Setup(r => r.Headers).Returns(headers);
 
         // Act
-        var result = await _function.Run(requestMock.Object, _cosmosClientMock.Object);
-
-        // Assert
-        result.Should().NotBeNull();
-        result.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        
-        var content = await GetResponseContent(result);
-        content!.RootElement.GetProperty("error").GetString().Should().Contain("multipart/form-data");
+        await Assert.ThrowsAsync<SuledFunctions.Exceptions.ValidationException>(() => _function.Run(requestMock.Object));
     }
 
     [Fact]
-    public async Task Run_WithMissingContentType_ReturnsBadRequest()
+    public async Task Run_WithMissingContentType_ThrowsValidationException()
     {
         // Arrange
         var requestMock = CreateMockRequest();
         var headers = new HttpHeadersCollection();
         requestMock.Setup(r => r.Headers).Returns(headers);
 
-        // Act
-        var result = await _function.Run(requestMock.Object, _cosmosClientMock.Object);
-
-        // Assert
-        result.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        // Act & Assert
+        await Assert.ThrowsAsync<SuledFunctions.Exceptions.ValidationException>(() => _function.Run(requestMock.Object));
     }
 
     [Fact]
-    public async Task Run_WhenParserThrowsException_ReturnsInternalServerError()
+    public async Task Run_WhenParserThrowsException_ThrowsFileProcessingException()
     {
         // Arrange
         _excelParserMock
@@ -154,15 +145,8 @@ public class UploadTournamentFunctionTests
 
         var requestMock = CreateMockMultipartRequest();
 
-        // Act
-        var result = await _function.Run(requestMock.Object, _cosmosClientMock.Object);
-
-        // Assert
-        result.Should().NotBeNull();
-        result.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
-        
-        var content = await GetResponseContent(result);
-        content!.RootElement.GetProperty("error").GetString().Should().Contain("Failed to process tournament file");
+        // Act & Assert
+        await Assert.ThrowsAsync<SuledFunctions.Exceptions.FileProcessingException>(() => _function.Run(requestMock.Object));
     }
 
     [Fact]
@@ -177,7 +161,7 @@ public class UploadTournamentFunctionTests
         var requestMock = CreateMockMultipartRequest();
 
         // Act
-        await _function.Run(requestMock.Object, _cosmosClientMock.Object);
+        await _function.Run(requestMock.Object);
 
         // Assert
         _loggerMock.Verify(
@@ -201,16 +185,16 @@ public class UploadTournamentFunctionTests
 
         var requestMock = CreateMockMultipartRequest();
 
-        // Act
-        await _function.Run(requestMock.Object, _cosmosClientMock.Object);
-
-        // Assert
+        // Act & Assert
+        await Assert.ThrowsAsync<SuledFunctions.Exceptions.FileProcessingException>(() => _function.Run(requestMock.Object));
+        
+        // Verify logging occurred
         _loggerMock.Verify(
             x => x.Log(
                 LogLevel.Error,
                 It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Error uploading tournament")),
-                exception,
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("parsing or saving tournament")),
+                It.IsAny<Exception>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
     }
@@ -235,7 +219,7 @@ public class UploadTournamentFunctionTests
         requestMock.Setup(r => r.Headers).Returns(headers);
 
         // Act
-        await _function.Run(requestMock.Object, _cosmosClientMock.Object);
+        await _function.Run(requestMock.Object);
 
         // Assert
         capturedFileName.Should().Be(expectedFileName);
@@ -256,7 +240,7 @@ public class UploadTournamentFunctionTests
         var requestMock = CreateMockMultipartRequest();
 
         // Act
-        await _function.Run(requestMock.Object, _cosmosClientMock.Object);
+        await _function.Run(requestMock.Object);
 
         // Assert
         capturedFileName.Should().Be("tournament.xlsx");
@@ -359,3 +343,5 @@ public class UploadTournamentFunctionTests
         };
     }
 }
+
+

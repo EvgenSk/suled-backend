@@ -1,44 +1,35 @@
 using FluentAssertions;
-using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
+using SuledFunctions.Configuration;
+using SuledFunctions.Exceptions;
 using SuledFunctions.Models;
 using SuledFunctions.Models.Optimized;
+using SuledFunctions.Repositories;
 using SuledFunctions.Services;
-using SuledFunctions.Services.Interfaces;
 
 namespace SuledFunctions.Tests.Services;
 
 public class TournamentServiceTests
 {
     private readonly Mock<ILogger<TournamentService>> _loggerMock;
-    private readonly Mock<CosmosClient> _cosmosClientMock;
-    private readonly Mock<Database> _databaseMock;
-    private readonly Mock<Container> _containerMock;
+    private readonly Mock<ITournamentRepository> _repositoryMock;
+    private readonly IOptions<TournamentSettings> _settings;
     private readonly TournamentService _service;
 
     public TournamentServiceTests()
     {
         _loggerMock = new Mock<ILogger<TournamentService>>();
-        _cosmosClientMock = new Mock<CosmosClient>();
-        _databaseMock = new Mock<Database>();
-        _containerMock = new Mock<Container>();
+        _repositoryMock = new Mock<ITournamentRepository>();
+        _settings = Options.Create(new TournamentSettings
+        {
+            MaxResultsDefault = 100,
+            GameDurationMinutes = 15,
+            BreakDurationMinutes = 5
+        });
         
-        // Set environment variables for database and container names
-        Environment.SetEnvironmentVariable("CosmosDbName", "TestDb");
-        Environment.SetEnvironmentVariable("CosmosContainerName", "TestContainer");
-        
-        // Setup Cosmos client to return database and container properly
-        _cosmosClientMock.Setup(c => c.GetDatabase("TestDb"))
-            .Returns(_databaseMock.Object);
-        _databaseMock.Setup(d => d.GetContainer("TestContainer"))
-            .Returns(_containerMock.Object);
-        
-        // Also setup the GetContainer on the client directly
-        _cosmosClientMock.Setup(c => c.GetContainer("TestDb", "TestContainer"))
-            .Returns(_containerMock.Object);
-        
-        _service = new TournamentService(_cosmosClientMock.Object, _loggerMock.Object);
+        _service = new TournamentService(_repositoryMock.Object, _settings, _loggerMock.Object);
     }
 
     [Fact]
@@ -46,7 +37,10 @@ public class TournamentServiceTests
     {
         // Arrange
         var tournaments = CreateTestTournaments();
-        SetupContainerMock(tournaments);
+        var compactTournaments = tournaments.Select(TournamentCompactMapper.ToCompact).ToList();
+        
+        _repositoryMock.Setup(r => r.QueryAsync(It.IsAny<TournamentQuerySpec>(), default))
+            .ReturnsAsync(compactTournaments);
 
         // Act
         var result = await _service.GetTournamentsAsync();
@@ -60,9 +54,13 @@ public class TournamentServiceTests
     {
         // Arrange
         var tournaments = CreateTestTournaments();
-        SetupContainerMock(tournaments.Where(t => 
+        var filtered = tournaments.Where(t => 
             t.StartDate >= new DateTime(2025, 2, 1) && 
-            t.StartDate <= new DateTime(2025, 2, 28)).ToList());
+            t.StartDate <= new DateTime(2025, 2, 28)).ToList();
+        var compactTournaments = filtered.Select(TournamentCompactMapper.ToCompact).ToList();
+
+        _repositoryMock.Setup(r => r.QueryAsync(It.IsAny<TournamentQuerySpec>(), default))
+            .ReturnsAsync(compactTournaments);
 
         var startDateFrom = new DateTime(2025, 2, 1);
         var startDateTo = new DateTime(2025, 2, 28);
@@ -78,153 +76,11 @@ public class TournamentServiceTests
     }
 
     [Fact]
-    public async Task GetTournamentsAsync_WithLocationFilter_FiltersCorrectly()
-    {
-        // Arrange
-        var tournaments = CreateTestTournaments();
-        var filtered = tournaments.Where(t => 
-            t.Location.Contains("York", StringComparison.OrdinalIgnoreCase)).ToList();
-        SetupContainerMock(filtered);
-
-        // Act
-        var result = await _service.GetTournamentsAsync(location: "york");
-
-        // Assert
-        result.Should().HaveCount(2);
-        result.Should().Contain(t => t.Location == "New York");
-        result.Should().Contain(t => t.Location == "York");
-    }
-
-    [Fact]
-    public async Task GetTournamentsAsync_WithDivisionFilter_FiltersCorrectly()
-    {
-        // Arrange
-        var tournaments = CreateTestTournaments();
-        var filtered = tournaments.Where(t => 
-            t.Division.Contains("Pro", StringComparison.OrdinalIgnoreCase)).ToList();
-        SetupContainerMock(filtered);
-
-        // Act
-        var result = await _service.GetTournamentsAsync(division: "pro");
-
-        // Assert
-        result.Should().HaveCount(1);
-        result.First().Division.Should().Be("Pro");
-    }
-
-    [Fact]
-    public async Task GetTournamentsAsync_WithStatusFilter_FiltersCorrectly()
-    {
-        // Arrange
-        var tournaments = CreateTestTournaments();
-        var filtered = tournaments.Where(t => t.Status == TournamentStatus.Upcoming).ToList();
-        SetupContainerMock(filtered);
-
-        // Act
-        var result = await _service.GetTournamentsAsync(status: TournamentStatus.Upcoming);
-
-        // Assert
-        result.Should().HaveCount(1);
-        result.First().Status.Should().Be(TournamentStatus.Upcoming);
-    }
-
-    [Fact]
-    public async Task GetTournamentsAsync_WithMaxResults_LimitsReturnedTournaments()
-    {
-        // Arrange
-        var tournaments = CreateTestTournaments();
-        SetupContainerMock(tournaments.Take(2).ToList());
-
-        // Act
-        var result = await _service.GetTournamentsAsync(maxResults: 2);
-
-        // Assert
-        result.Should().HaveCountLessThanOrEqualTo(2);
-    }
-
-    [Fact]
-    public async Task GetTournamentsAsync_WithMultipleFilters_CombinesFiltersCorrectly()
-    {
-        // Arrange
-        var tournaments = CreateTestTournaments();
-        var startDateFrom = new DateTime(2025, 1, 1);
-        var startDateTo = new DateTime(2025, 12, 31);
-        
-        var filtered = tournaments.Where(t => 
-            t.StartDate >= startDateFrom &&
-            t.StartDate <= startDateTo &&
-            t.Location.Contains("New York", StringComparison.OrdinalIgnoreCase) &&
-            t.Status == TournamentStatus.InProgress).ToList();
-        
-        SetupContainerMock(filtered);
-
-        // Act
-        var result = await _service.GetTournamentsAsync(
-            startDateFrom: startDateFrom,
-            startDateTo: startDateTo,
-            location: "New York",
-            status: TournamentStatus.InProgress);
-
-        // Assert
-        result.Should().HaveCount(1);
-        result.First().Name.Should().Be("January Tournament");
-    }
-
-    [Fact]
-    public async Task GetTournamentsAsync_CaseInsensitiveLocationSearch_ReturnsMatches()
-    {
-        // Arrange
-        var tournaments = CreateTestTournaments();
-        var filtered = tournaments.Where(t => 
-            t.Location.Contains("YORK", StringComparison.OrdinalIgnoreCase)).ToList();
-        SetupContainerMock(filtered);
-
-        // Act
-        var result = await _service.GetTournamentsAsync(location: "YORK");
-
-        // Assert
-        result.Should().HaveCount(2);
-    }
-
-    [Fact]
-    public async Task GetTournamentsAsync_PartialLocationMatch_ReturnsMatches()
-    {
-        // Arrange
-        var tournaments = CreateTestTournaments();
-        var filtered = tournaments.Where(t => 
-            t.Location.Contains("New", StringComparison.OrdinalIgnoreCase)).ToList();
-        SetupContainerMock(filtered);
-
-        // Act
-        var result = await _service.GetTournamentsAsync(location: "New");
-
-        // Assert
-        result.Should().HaveCount(1);
-        result.First().Location.Should().Be("New York");
-    }
-
-    [Fact]
-    public async Task GetTournamentsAsync_CaseInsensitiveDivisionSearch_ReturnsMatches()
-    {
-        // Arrange
-        var tournaments = CreateTestTournaments();
-        var filtered = tournaments.Where(t => 
-            t.Division.Contains("AMATEUR", StringComparison.OrdinalIgnoreCase)).ToList();
-        SetupContainerMock(filtered);
-
-        // Act
-        var result = await _service.GetTournamentsAsync(division: "AMATEUR");
-
-        // Assert
-        result.Should().HaveCount(1);
-        result.First().Division.Should().Be("Amateur");
-    }
-
-    [Fact]
     public async Task GetTournamentsAsync_WithEmptyResult_ReturnsEmptyList()
     {
         // Arrange
-        SetupContainerMock(new List<Tournament>());
+        _repositoryMock.Setup(r => r.QueryAsync(It.IsAny<TournamentQuerySpec>(), default))
+            .ReturnsAsync(new List<TournamentCompact>());
 
         // Act
         var result = await _service.GetTournamentsAsync();
@@ -239,15 +95,9 @@ public class TournamentServiceTests
         // Arrange
         var tournament = CreateTestTournaments().First();
         var compactTournament = TournamentCompactMapper.ToCompact(tournament);
-        var responseMock = new Mock<ItemResponse<TournamentCompact>>();
-        responseMock.Setup(r => r.Resource).Returns(compactTournament);
         
-        _containerMock.Setup(c => c.ReadItemAsync<TournamentCompact>(
-            tournament.Id,
-            It.IsAny<PartitionKey>(),
-            null,
-            default))
-            .ReturnsAsync(responseMock.Object);
+        _repositoryMock.Setup(r => r.GetByIdAsync(tournament.Id, default))
+            .ReturnsAsync(compactTournament);
 
         // Act
         var result = await _service.GetTournamentByIdAsync(tournament.Id);
@@ -262,12 +112,8 @@ public class TournamentServiceTests
     public async Task GetTournamentByIdAsync_WithInvalidId_ReturnsNull()
     {
         // Arrange
-        _containerMock.Setup(c => c.ReadItemAsync<TournamentCompact>(
-            It.IsAny<string>(),
-            It.IsAny<PartitionKey>(),
-            null,
-            default))
-            .ThrowsAsync(new CosmosException("Not found", System.Net.HttpStatusCode.NotFound, 0, "", 0));
+        _repositoryMock.Setup(r => r.GetByIdAsync(It.IsAny<string>(), default))
+            .ReturnsAsync((TournamentCompact?)null);
 
         // Act
         var result = await _service.GetTournamentByIdAsync("invalid-id");
@@ -277,11 +123,22 @@ public class TournamentServiceTests
     }
 
     [Fact]
+    public async Task GetTournamentByIdAsync_WithEmptyId_ThrowsValidationException()
+    {
+        // Act & Assert
+        await Assert.ThrowsAsync<ValidationException>(() => 
+            _service.GetTournamentByIdAsync(""));
+    }
+
+    [Fact]
     public async Task GetTournamentsAsync_LogsResultCount()
     {
         // Arrange
         var tournaments = CreateTestTournaments();
-        SetupContainerMock(tournaments);
+        var compactTournaments = tournaments.Select(TournamentCompactMapper.ToCompact).ToList();
+        
+        _repositoryMock.Setup(r => r.QueryAsync(It.IsAny<TournamentQuerySpec>(), default))
+            .ReturnsAsync(compactTournaments);
 
         // Act
         await _service.GetTournamentsAsync();
@@ -372,31 +229,5 @@ public class TournamentServiceTests
                 }
             }
         };
-    }
-
-    private void SetupContainerMock(List<Tournament> tournaments)
-    {
-        // Convert tournaments to compact format for mocking
-        var compactTournaments = tournaments.Select(TournamentCompactMapper.ToCompact).ToList();
-        
-        var iteratorMock = new Mock<FeedIterator<TournamentCompact>>();
-        var responseMock = new Mock<FeedResponse<TournamentCompact>>();
-
-        // Setup the response to return compact tournaments
-        responseMock.Setup(r => r.GetEnumerator()).Returns(compactTournaments.GetEnumerator());
-        responseMock.Setup(r => r.Resource).Returns(compactTournaments);
-
-        // Setup iterator behavior - first call returns true, second call returns false
-        var callCount = 0;
-        iteratorMock.Setup(i => i.HasMoreResults).Returns(() => callCount++ == 0);
-        iteratorMock.Setup(i => i.ReadNextAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(responseMock.Object);
-
-        // Setup container to return iterator
-        _containerMock.Setup(c => c.GetItemQueryIterator<TournamentCompact>(
-            It.IsAny<QueryDefinition>(),
-            It.IsAny<string>(),
-            It.IsAny<QueryRequestOptions>()))
-            .Returns(iteratorMock.Object);
     }
 }

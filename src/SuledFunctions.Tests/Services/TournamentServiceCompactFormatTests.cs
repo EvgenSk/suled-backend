@@ -1,9 +1,11 @@
 using FluentAssertions;
-using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
+using SuledFunctions.Configuration;
 using SuledFunctions.Models;
 using SuledFunctions.Models.Optimized;
+using SuledFunctions.Repositories;
 using SuledFunctions.Services;
 using System.Text.Json;
 
@@ -16,29 +18,20 @@ namespace SuledFunctions.Tests.Services;
 public class TournamentServiceCompactFormatTests
 {
     private readonly Mock<ILogger<TournamentService>> _loggerMock;
-    private readonly Mock<CosmosClient> _cosmosClientMock;
-    private readonly Mock<Database> _databaseMock;
-    private readonly Mock<Container> _containerMock;
+    private readonly Mock<ITournamentRepository> _repositoryMock;
+    private readonly IOptions<TournamentSettings> _settings;
     private readonly TournamentService _service;
 
     public TournamentServiceCompactFormatTests()
     {
         _loggerMock = new Mock<ILogger<TournamentService>>();
-        _cosmosClientMock = new Mock<CosmosClient>();
-        _databaseMock = new Mock<Database>();
-        _containerMock = new Mock<Container>();
+        _repositoryMock = new Mock<ITournamentRepository>();
+        _settings = Options.Create(new TournamentSettings
+        {
+            MaxResultsDefault = 100
+        });
 
-        Environment.SetEnvironmentVariable("CosmosDbName", "TestDb");
-        Environment.SetEnvironmentVariable("CosmosContainerName", "TestContainer");
-
-        _cosmosClientMock.Setup(c => c.GetDatabase("TestDb"))
-            .Returns(_databaseMock.Object);
-        _databaseMock.Setup(d => d.GetContainer("TestContainer"))
-            .Returns(_containerMock.Object);
-        _cosmosClientMock.Setup(c => c.GetContainer("TestDb", "TestContainer"))
-            .Returns(_containerMock.Object);
-
-        _service = new TournamentService(_cosmosClientMock.Object, _loggerMock.Object);
+        _service = new TournamentService(_repositoryMock.Object, _settings, _loggerMock.Object);
     }
 
     [Fact]
