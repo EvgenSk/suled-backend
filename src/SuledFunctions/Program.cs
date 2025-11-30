@@ -14,6 +14,7 @@ using OfficeOpenXml;
 using Microsoft.Azure.Cosmos;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using FluentValidation;
 
 var builder = FunctionsApplication.CreateBuilder(args);
 
@@ -81,6 +82,9 @@ builder.Services.AddScoped<IRoundCalculationService, RoundCalculationService>();
 builder.Services.AddScoped<IExcelMetadataExtractor, ExcelMetadataExtractor>();
 builder.Services.AddScoped<IExcelGameParser, ExcelGameParser>();
 builder.Services.AddScoped<IPairStructureConverter, PairStructureConverter>();
+
+// Register FluentValidation validators
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 builder.Services
     .AddApplicationInsightsTelemetryWorkerService()

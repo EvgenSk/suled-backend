@@ -9,6 +9,7 @@ using SuledFunctions.Exceptions;
 using SuledFunctions.Services.Interfaces;
 using SuledFunctions.Repositories;
 using SuledFunctions.Models.Optimized;
+using SuledFunctions.Models.DTOs;
 
 namespace SuledFunctions.Functions;
 
@@ -122,16 +123,22 @@ public class UploadTournamentFunction
             _logger.LogInformation("Tournament {TournamentId} saved to Cosmos DB in compact format with {PairCount} pairs",
                 tournament.Id, tournament.Pairs.Count);
 
-            // Create success response
-            var response = req.CreateResponse(HttpStatusCode.Created);
-            await response.WriteAsJsonAsync(new
+            // Create success response using unified response model
+            var responseData = new
             {
                 id = tournament.Id,
                 name = tournament.Name,
                 gameCount = tournament.Games.Count,
-                message = Constants.SuccessMessages.TournamentUploaded
-            });
+                pairCount = tournament.Pairs.Count
+            };
 
+            var apiResponse = CreatedResponse<dynamic>.Created(
+                tournament.Id,
+                responseData,
+                Constants.SuccessMessages.TournamentUploaded);
+
+            var response = req.CreateResponse(HttpStatusCode.Created);
+            await response.WriteAsJsonAsync(apiResponse);
             return response;
         }
         catch (Exception ex) when (ex is not AppException)

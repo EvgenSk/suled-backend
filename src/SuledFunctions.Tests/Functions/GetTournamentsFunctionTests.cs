@@ -1,4 +1,6 @@
 using FluentAssertions;
+using FluentValidation;
+using FluentValidation.Results;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,8 +9,10 @@ using Microsoft.Extensions.Options;
 using Moq;
 using SuledFunctions.Functions;
 using SuledFunctions.Models;
+using SuledFunctions.Models.Requests;
 using SuledFunctions.Services.Interfaces;
 using SuledFunctions.Tests.Helpers;
+using SuledFunctions.Validators;
 using System.Net;
 using System.Text.Json;
 
@@ -18,13 +22,20 @@ public class GetTournamentsFunctionTests
 {
     private readonly Mock<ILogger<GetTournamentsFunction>> _loggerMock;
     private readonly Mock<ITournamentService> _tournamentServiceMock;
+    private readonly Mock<IValidator<GetTournamentsQuery>> _validatorMock;
     private readonly GetTournamentsFunction _function;
 
     public GetTournamentsFunctionTests()
     {
         _loggerMock = new Mock<ILogger<GetTournamentsFunction>>();
         _tournamentServiceMock = new Mock<ITournamentService>();
-        _function = new GetTournamentsFunction(_tournamentServiceMock.Object, _loggerMock.Object);
+        _validatorMock = new Mock<IValidator<GetTournamentsQuery>>();
+        
+        // Setup validator to return valid by default
+        _validatorMock.Setup(v => v.ValidateAsync(It.IsAny<GetTournamentsQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ValidationResult());
+        
+        _function = new GetTournamentsFunction(_tournamentServiceMock.Object, _validatorMock.Object, _loggerMock.Object);
     }
 
     [Fact]
@@ -47,8 +58,9 @@ public class GetTournamentsFunctionTests
 
         var content = await GetResponseContent(response);
         content.Should().NotBeNull();
-        var tournamentsArray = content!.RootElement;
-        tournamentsArray.GetArrayLength().Should().Be(3);
+        var apiResponse = content!.RootElement;
+        apiResponse.GetProperty("success").GetBoolean().Should().BeTrue();
+        apiResponse.GetProperty("data").GetArrayLength().Should().Be(3);
     }
 
     [Fact]
@@ -240,7 +252,9 @@ public class GetTournamentsFunctionTests
 
         // Assert
         var content = await GetResponseContent(response);
-        var firstTournament = content!.RootElement[0];
+        var apiResponse = content!.RootElement;
+        var tournamentsArray = apiResponse.GetProperty("data");
+        var firstTournament = tournamentsArray[0];
 
         firstTournament.TryGetProperty("id", out _).Should().BeTrue();
         firstTournament.TryGetProperty("name", out _).Should().BeTrue();
@@ -293,7 +307,8 @@ public class GetTournamentsFunctionTests
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var content = await GetResponseContent(response);
-        var tournamentsArray = content!.RootElement;
+        var apiResponse = content!.RootElement;
+        var tournamentsArray = apiResponse.GetProperty("data");
         
         // First tournament with warmup
         var firstTournament = tournamentsArray[0];
@@ -387,7 +402,8 @@ public class GetTournamentsFunctionTests
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var content = await GetResponseContent(response);
-        content!.RootElement.GetArrayLength().Should().Be(0);
+        var apiResponse = content!.RootElement;
+        apiResponse.GetProperty("data").GetArrayLength().Should().Be(0);
     }
 
     [Fact]
@@ -416,7 +432,7 @@ public class GetTournamentsFunctionTests
     }
 
     [Fact]
-    public async Task Run_WhenServiceThrowsException_ReturnsInternalServerError()
+    public async Task Run_WhenServiceThrowsException_ThrowsException()
     {
         // Arrange
         _tournamentServiceMock.Setup(s => s.GetTournamentsAsync(
@@ -425,14 +441,8 @@ public class GetTournamentsFunctionTests
 
         var requestMock = CreateMockRequest();
 
-        // Act
-        var response = await _function.Run(requestMock.Object);
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
-        var content = await GetResponseContent(response);
-        content!.RootElement.GetProperty("error").GetString()
-            .Should().Contain("An error occurred while retrieving tournaments");
+        // Act & Assert - Function should now let exceptions bubble up to middleware
+        await Assert.ThrowsAsync<Exception>(async () => await _function.Run(requestMock.Object));
     }
 
     // Helper methods

@@ -104,10 +104,15 @@ public class UploadTournamentFunctionTests
         // Assert
         var content = await GetResponseContent(result);
         
-        content!.RootElement.GetProperty("id").GetString().Should().Be(tournament.Id);
-        content.RootElement.GetProperty("name").GetString().Should().Be(tournament.Name);
-        content.RootElement.GetProperty("gameCount").GetInt32().Should().Be(tournament.Games.Count);
-        content.RootElement.GetProperty("message").GetString().Should().Be("Tournament uploaded successfully");
+        // CreatedResponse wraps the data
+        var apiResponse = content!.RootElement;
+        apiResponse.GetProperty("success").GetBoolean().Should().BeTrue();
+        apiResponse.GetProperty("message").GetString().Should().Be("Tournament uploaded successfully");
+        
+        var data = apiResponse.GetProperty("data");
+        data.GetProperty("id").GetString().Should().Be(tournament.Id);
+        data.GetProperty("name").GetString().Should().Be(tournament.Name);
+        data.GetProperty("gameCount").GetInt32().Should().Be(tournament.Games.Count);
     }
 
     [Fact]
