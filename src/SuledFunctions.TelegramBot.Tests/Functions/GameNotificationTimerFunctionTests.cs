@@ -77,32 +77,44 @@ public class GameNotificationTimerFunctionTests
         var gameId = "game-456";
         var scheduledTime = DateTime.UtcNow.AddMinutes(5);
 
-        var game = new Game
-        {
-            Id = gameId,
-            Round = 1,
-            CourtNumber = 5,
-            ScheduledTime = scheduledTime,
-            Status = GameStatus.Scheduled,
-            Pair1 = new Pair 
-            { 
-                Id = pairId, 
-                Player1 = new Player { Name = "Team", Surname = "Alpha" },
-                Player2 = new Player { Name = "Player", Surname = "A" }
-            },
-            Pair2 = new Pair 
-            { 
-                Id = "pair-789", 
-                Player1 = new Player { Name = "Team", Surname = "Beta" },
-                Player2 = new Player { Name = "Player", Surname = "B" }
-            }
+        var targetPair = new Pair 
+        { 
+            Id = pairId, 
+            Player1 = new Player { Name = "Team", Surname = "Alpha" },
+            Player2 = new Player { Name = "Player", Surname = "A" }
+        };
+
+        var opponentPair = new Pair 
+        { 
+            Id = "pair-789", 
+            Player1 = new Player { Name = "Team", Surname = "Beta" },
+            Player2 = new Player { Name = "Player", Surname = "B" }
         };
 
         var tournament = new Tournament
         {
             Id = "tournament-1",
             Name = "Test Tournament",
-            Games = new List<Game> { game }
+            Pairs = new List<TournamentPair>
+            {
+                new TournamentPair
+                {
+                    PairInfo = targetPair,
+                    Games = new List<PairGame>
+                    {
+                        new PairGame
+                        {
+                            Id = gameId,
+                            TournamentId = "tournament-1",
+                            Round = 1,
+                            CourtNumber = 5,
+                            ScheduledTime = scheduledTime,
+                            Status = GameStatus.Scheduled,
+                            OpponentPair = opponentPair
+                        }
+                    }
+                }
+            }
         };
 
         var subscription = new UserSubscription
@@ -157,32 +169,44 @@ public class GameNotificationTimerFunctionTests
         var gameId = "game-456";
         var scheduledTime = DateTime.UtcNow.AddMinutes(5);
 
-        var game = new Game
-        {
-            Id = gameId,
-            Round = 1,
-            CourtNumber = 5,
-            ScheduledTime = scheduledTime,
-            Status = GameStatus.Scheduled,
-            Pair1 = new Pair 
-            { 
-                Id = pairId, 
-                Player1 = new Player { Name = "Team", Surname = "Alpha" },
-                Player2 = new Player { Name = "Player", Surname = "A" }
-            },
-            Pair2 = new Pair 
-            { 
-                Id = "pair-789", 
-                Player1 = new Player { Name = "Team", Surname = "Beta" },
-                Player2 = new Player { Name = "Player", Surname = "B" }
-            }
+        var targetPair = new Pair 
+        { 
+            Id = pairId, 
+            Player1 = new Player { Name = "Team", Surname = "Alpha" },
+            Player2 = new Player { Name = "Player", Surname = "A" }
+        };
+
+        var opponentPair = new Pair 
+        { 
+            Id = "pair-789", 
+            Player1 = new Player { Name = "Team", Surname = "Beta" },
+            Player2 = new Player { Name = "Player", Surname = "B" }
         };
 
         var tournament = new Tournament
         {
             Id = "tournament-1",
             Name = "Test Tournament",
-            Games = new List<Game> { game }
+            Pairs = new List<TournamentPair>
+            {
+                new TournamentPair
+                {
+                    PairInfo = targetPair,
+                    Games = new List<PairGame>
+                    {
+                        new PairGame
+                        {
+                            Id = gameId,
+                            TournamentId = "tournament-1",
+                            Round = 1,
+                            CourtNumber = 5,
+                            ScheduledTime = scheduledTime,
+                            Status = GameStatus.Scheduled,
+                            OpponentPair = opponentPair
+                        }
+                    }
+                }
+            }
         };
 
         var subscription = new UserSubscription

@@ -79,7 +79,7 @@ public class GetTournamentsFunction
             Description = t.Description,
             Warmup = t.Warmup,
             Status = t.Status.ToString(),
-            GameCount = t.Games?.Count ?? 0,
+            GameCount = t.Pairs?.Sum(p => p.Games?.Count ?? 0) ?? 0,
             CreatedDate = t.CreatedDate,
             Rounds = t.Rounds?.Select(r => new TournamentRoundDto
             {

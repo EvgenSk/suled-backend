@@ -74,7 +74,6 @@ builder.Services.AddScoped<ITournamentRepository, TournamentRepository>();
 // Register application services
 builder.Services.AddScoped<IExcelParserService, ExcelParserService>();
 builder.Services.AddScoped<IPairService, PairService>();
-builder.Services.AddScoped<IGameService, GameService>();
 builder.Services.AddScoped<ITournamentService, TournamentService>();
 builder.Services.AddScoped<IRoundCalculationService, RoundCalculationService>();
 

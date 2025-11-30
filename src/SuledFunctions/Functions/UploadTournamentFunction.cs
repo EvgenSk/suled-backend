@@ -119,7 +119,7 @@ public class UploadTournamentFunction
             {
                 id = tournament.Id,
                 name = tournament.Name,
-                gameCount = tournament.Games.Count,
+                gameCount = tournament.Pairs.Sum(p => p.Games.Count),
                 pairCount = tournament.Pairs.Count
             };
 

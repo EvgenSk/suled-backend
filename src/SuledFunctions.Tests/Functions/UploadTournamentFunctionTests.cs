@@ -121,7 +121,7 @@ public class UploadTournamentFunctionTests
         var data = apiResponse.GetProperty("data");
         data.GetProperty("id").GetString().Should().Be(tournament.Id);
         data.GetProperty("name").GetString().Should().Be(tournament.Name);
-        data.GetProperty("gameCount").GetInt32().Should().Be(tournament.Games.Count);
+        data.GetProperty("gameCount").GetInt32().Should().Be(tournament.Pairs.Sum(p => p.Games.Count));
     }
 
     [Fact]

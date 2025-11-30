@@ -33,8 +33,11 @@ public record Tournament
     // Pair-centered: Tournament contains pairs, each with their games
     public List<TournamentPair> Pairs { get; set; } = new();
     
-    // DEPRECATED: Keep for backward compatibility during migration
+    // DEPRECATED: Keep for backward compatibility with existing tests
+    // DO NOT USE in production code - use Pairs collection instead
+    // This property exists only for tests that initialize empty tournaments
     [JsonIgnore]
+    [Obsolete("Use Pairs collection instead. This property is kept only for backward compatibility with tests.")]
     public List<Game> Games { get; set; } = new();
 }
 

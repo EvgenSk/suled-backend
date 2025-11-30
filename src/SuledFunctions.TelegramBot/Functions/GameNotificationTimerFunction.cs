@@ -68,11 +68,13 @@ public class GameNotificationTimerFunction
         IEnumerable<Tournament> tournaments,
         DateTime now)
     {
+        // Find pair's games from pair-centered structure
         var upcomingGames = tournaments
-            .Where(t => t.Games != null)
-            .SelectMany(t => t.Games!)
+            .Where(t => t.Pairs != null)
+            .SelectMany(t => t.Pairs)
+            .Where(tp => tp.PairInfo.Id == subscription.PairId)
+            .SelectMany(tp => tp.Games ?? Enumerable.Empty<PairGame>())
             .Where(g => 
-                (g.Pair1?.Id == subscription.PairId || g.Pair2?.Id == subscription.PairId) &&
                 g.ScheduledTime.HasValue &&
                 g.Status == GameStatus.Scheduled)
             .Where(g =>
@@ -91,13 +93,12 @@ public class GameNotificationTimerFunction
                 continue;
             }
 
-            var (userPair, opponent) = game.Pair1?.Id == subscription.PairId 
-                ? (game.Pair1, game.Pair2?.DisplayName ?? "Unknown")
-                : (game.Pair2, game.Pair1?.DisplayName ?? "Unknown");
+            // In pair-centered model, games are from the subscribed pair's perspective
+            var opponent = game.OpponentPair?.DisplayName ?? "Unknown";
 
             await _botService.SendUpcomingGameNotificationAsync(
                 subscription.ChatId,
-                userPair?.DisplayName ?? subscription.PairDisplayName,
+                subscription.PairDisplayName,
                 game.Round,
                 game.CourtNumber,
                 opponent,

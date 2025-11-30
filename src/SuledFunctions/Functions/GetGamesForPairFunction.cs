@@ -3,7 +3,7 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using System.Net;
 using SuledFunctions.Models;
-using SuledFunctions.Services.Interfaces;
+using SuledFunctions.Models.DTOs;
 
 namespace SuledFunctions.Functions;
 
@@ -12,12 +12,10 @@ namespace SuledFunctions.Functions;
 /// </summary>
 public class GetGamesForPairFunction
 {
-    private readonly IGameService _gameService;
     private readonly ILogger<GetGamesForPairFunction> _logger;
 
-    public GetGamesForPairFunction(IGameService gameService, ILogger<GetGamesForPairFunction> logger)
+    public GetGamesForPairFunction(ILogger<GetGamesForPairFunction> logger)
     {
-        _gameService = gameService;
         _logger = logger;
     }
 
@@ -30,15 +28,15 @@ public class GetGamesForPairFunction
             databaseName: "%CosmosDbName%",
             containerName: "%CosmosContainerName%",
             Connection = "CosmosDbConnection",
-            SqlQuery = "SELECT * FROM c WHERE c.Games != null")]
+            SqlQuery = "SELECT * FROM c WHERE c.Pairs != null")]
         IEnumerable<Tournament> tournaments)
     {
         _logger.LogInformation("Getting games for pair: {PairId}", pairId);
 
         try
         {
-            // Use service to get games for the pair
-            var games = _gameService.GetGamesForPair(tournaments, pairId);
+            // Query games from pair-centered structure
+            var games = GetGamesForPair(tournaments, pairId);
 
             var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(new
@@ -57,5 +55,40 @@ public class GetGamesForPairFunction
             await errorResponse.WriteAsJsonAsync(new { error = "Failed to retrieve games" });
             return errorResponse;
         }
+    }
+
+    private IEnumerable<GameDto> GetGamesForPair(IEnumerable<Tournament> tournaments, string pairId)
+    {
+        if (tournaments == null || string.IsNullOrEmpty(pairId))
+        {
+            return Enumerable.Empty<GameDto>();
+        }
+
+        var pairGames = new List<GameDto>();
+        
+        foreach (var tournament in tournaments.Where(t => t.Pairs != null))
+        {
+            var pair = tournament.Pairs.FirstOrDefault(p => p.PairInfo.Id == pairId);
+            if (pair?.Games != null)
+            {
+                var games = pair.Games
+                    .OrderBy(g => g.Round)
+                    .ThenBy(g => g.CourtNumber)
+                    .Select(g => new GameDto
+                    {
+                        Id = g.Id,
+                        Round = g.Round,
+                        CourtNumber = g.CourtNumber,
+                        Status = g.Status.ToString(),
+                        ScheduledTime = g.ScheduledTime,
+                        Pair1 = pair.PairInfo.DisplayName,
+                        Pair2 = g.OpponentPair?.DisplayName ?? "Unknown",
+                        IsOurGame = true
+                    });
+                pairGames.AddRange(games);
+            }
+        }
+        
+        return pairGames;
     }
 }

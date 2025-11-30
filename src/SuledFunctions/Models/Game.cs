@@ -1,7 +1,8 @@
 namespace SuledFunctions.Models;
 
 /// <summary>
-/// Represents a single game in the tournament
+/// Represents a single game in the tournament (used as intermediate structure during Excel parsing)
+/// This model is converted to the pair-centered structure (TournamentPair -> PairGame) after parsing
 /// </summary>
 public record Game
 {
@@ -13,12 +14,4 @@ public record Game
     public Pair Pair2 { get; set; } = new();
     public DateTime? ScheduledTime { get; set; }
     public GameStatus Status { get; set; } = GameStatus.Scheduled;
-}
-
-public enum GameStatus
-{
-    Scheduled,
-    InProgress,
-    Completed,
-    Cancelled
 }

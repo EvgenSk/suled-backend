@@ -7,8 +7,6 @@ using Microsoft.Extensions.Options;
 using Moq;
 using SuledFunctions.Functions;
 using SuledFunctions.Models;
-using SuledFunctions.Services;
-using SuledFunctions.Services.Interfaces;
 using SuledFunctions.Tests.Helpers;
 using System.Net;
 using System.Text.Json;
@@ -23,8 +21,7 @@ public class GetGamesForPairFunctionTests
     public GetGamesForPairFunctionTests()
     {
         _loggerMock = new Mock<ILogger<GetGamesForPairFunction>>();
-        var gameService = new GameService(); // Use real service instead of mock
-        _function = new GetGamesForPairFunction(gameService, _loggerMock.Object);
+        _function = new GetGamesForPairFunction(_loggerMock.Object);
     }
 
     [Fact]
@@ -83,12 +80,19 @@ public class GetGamesForPairFunctionTests
         {
             Id = "test-1",
             Name = "Test Tournament",
-            Games = new List<Game>
+            Pairs = new List<TournamentPair>
             {
-                new Game { Id = "g3", Pair1 = targetPair, Pair2 = otherPair, Round = 2, CourtNumber = 2 },
-                new Game { Id = "g1", Pair1 = targetPair, Pair2 = otherPair, Round = 1, CourtNumber = 1 },
-                new Game { Id = "g4", Pair1 = otherPair, Pair2 = targetPair, Round = 2, CourtNumber = 3 },
-                new Game { Id = "g2", Pair1 = targetPair, Pair2 = otherPair, Round = 1, CourtNumber = 2 }
+                new TournamentPair
+                {
+                    PairInfo = targetPair,
+                    Games = new List<PairGame>
+                    {
+                        new PairGame { Id = "g3", TournamentId = "test-1", Round = 2, CourtNumber = 2, OpponentPair = otherPair },
+                        new PairGame { Id = "g1", TournamentId = "test-1", Round = 1, CourtNumber = 1, OpponentPair = otherPair },
+                        new PairGame { Id = "g4", TournamentId = "test-1", Round = 2, CourtNumber = 3, OpponentPair = otherPair },
+                        new PairGame { Id = "g2", TournamentId = "test-1", Round = 1, CourtNumber = 2, OpponentPair = otherPair }
+                    }
+                }
             }
         };
 
@@ -134,9 +138,16 @@ public class GetGamesForPairFunctionTests
         {
             Id = "test-1",
             Name = "Test Tournament",
-            Games = new List<Game>
+            Pairs = new List<TournamentPair>
             {
-                new Game { Id = "g1", Pair1 = targetPair, Pair2 = otherPair, Round = 1, CourtNumber = 1 }
+                new TournamentPair
+                {
+                    PairInfo = targetPair,
+                    Games = new List<PairGame>
+                    {
+                        new PairGame { Id = "g1", TournamentId = "test-1", Round = 1, CourtNumber = 1, OpponentPair = otherPair }
+                    }
+                }
             }
         };
 
@@ -152,9 +163,9 @@ public class GetGamesForPairFunctionTests
     }
 
     [Fact]
-    public async Task Run_IncludesIsOurGameFlag_WhenPairIsPair2()
+    public async Task Run_IncludesIsOurGameFlag_Always()
     {
-        // Arrange
+        // Arrange - in pair-centered model, games are always from the pair's perspective
         var pairId = "pair-1";
         var player1 = new Player { Name = "John", Surname = "Doe" };
         var player2 = new Player { Name = "Jane", Surname = "Smith" };
@@ -168,9 +179,16 @@ public class GetGamesForPairFunctionTests
         {
             Id = "test-1",
             Name = "Test Tournament",
-            Games = new List<Game>
+            Pairs = new List<TournamentPair>
             {
-                new Game { Id = "g1", Pair1 = otherPair, Pair2 = targetPair, Round = 1, CourtNumber = 1 }
+                new TournamentPair
+                {
+                    PairInfo = targetPair,
+                    Games = new List<PairGame>
+                    {
+                        new PairGame { Id = "g1", TournamentId = "test-1", Round = 1, CourtNumber = 1, OpponentPair = otherPair }
+                    }
+                }
             }
         };
 
@@ -179,10 +197,10 @@ public class GetGamesForPairFunctionTests
         // Act
         var response = await _function.Run(requestMock.Object, pairId, new[] { tournament });
 
-        // Assert
+        // Assert - in pair-centered model, games are always from the pair's perspective
         var content = await GetResponseContent(response);
         var game = content!.RootElement.GetProperty("games")[0];
-        game.GetProperty("isOurGame").GetBoolean().Should().BeFalse();
+        game.GetProperty("isOurGame").GetBoolean().Should().BeTrue();
     }
 
     [Fact]
@@ -323,14 +341,22 @@ public class GetGamesForPairFunctionTests
         var player4 = new Player { Name = "Bob", Surname = "White" };
         var otherPair = new Pair { Id = "other-pair", Player1 = player3, Player2 = player4 };
 
+        // Create pair-centered structure
         return new Tournament
         {
             Id = tournamentId,
             Name = $"Tournament {tournamentId}",
-            Games = new List<Game>
+            Pairs = new List<TournamentPair>
             {
-                new Game { Id = $"{tournamentId}-g1", Pair1 = targetPair, Pair2 = otherPair, Round = 1, CourtNumber = 1, Status = GameStatus.Scheduled },
-                new Game { Id = $"{tournamentId}-g2", Pair1 = otherPair, Pair2 = targetPair, Round = 2, CourtNumber = 1, Status = GameStatus.Scheduled }
+                new TournamentPair
+                {
+                    PairInfo = targetPair,
+                    Games = new List<PairGame>
+                    {
+                        new PairGame { Id = $"{tournamentId}-g1", TournamentId = tournamentId, Round = 1, CourtNumber = 1, OpponentPair = otherPair, Status = GameStatus.Scheduled },
+                        new PairGame { Id = $"{tournamentId}-g2", TournamentId = tournamentId, Round = 2, CourtNumber = 1, OpponentPair = otherPair, Status = GameStatus.Scheduled }
+                    }
+                }
             }
         };
     }

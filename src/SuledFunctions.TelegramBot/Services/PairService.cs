@@ -35,14 +35,14 @@ public class PairService : IPairService
             tournaments.AddRange(results);
         }
 
-        // Extract unique pairs
+        // Extract unique pairs from pair-centered structure
         var pairs = tournaments
-            .Where(t => t.Games != null)
-            .SelectMany(t => t.Games)
-            .SelectMany(g => new[] { g.Pair1, g.Pair2 })
+            .Where(t => t.Pairs != null)
+            .SelectMany(t => t.Pairs)
+            .Select(tp => tp.PairInfo)
             .Where(p => p != null)
-            .GroupBy(p => p!.Id)
-            .Select(g => g.First()!)
+            .GroupBy(p => p.Id)
+            .Select(g => g.First())
             .OrderBy(p => p.DisplayName)
             .Select(p => new PairDto
             {
