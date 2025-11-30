@@ -3,6 +3,7 @@ using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
 using Moq;
 using SuledFunctions.Models;
+using SuledFunctions.Models.Optimized;
 using SuledFunctions.Services;
 using SuledFunctions.Services.Interfaces;
 
@@ -237,10 +238,11 @@ public class TournamentServiceTests
     {
         // Arrange
         var tournament = CreateTestTournaments().First();
-        var responseMock = new Mock<ItemResponse<Tournament>>();
-        responseMock.Setup(r => r.Resource).Returns(tournament);
+        var compactTournament = TournamentCompactMapper.ToCompact(tournament);
+        var responseMock = new Mock<ItemResponse<TournamentCompact>>();
+        responseMock.Setup(r => r.Resource).Returns(compactTournament);
         
-        _containerMock.Setup(c => c.ReadItemAsync<Tournament>(
+        _containerMock.Setup(c => c.ReadItemAsync<TournamentCompact>(
             tournament.Id,
             It.IsAny<PartitionKey>(),
             null,
@@ -260,7 +262,7 @@ public class TournamentServiceTests
     public async Task GetTournamentByIdAsync_WithInvalidId_ReturnsNull()
     {
         // Arrange
-        _containerMock.Setup(c => c.ReadItemAsync<Tournament>(
+        _containerMock.Setup(c => c.ReadItemAsync<TournamentCompact>(
             It.IsAny<string>(),
             It.IsAny<PartitionKey>(),
             null,
@@ -310,7 +312,18 @@ public class TournamentServiceTests
                 StartDate = new DateTime(2025, 1, 15),
                 EndDate = new DateTime(2025, 1, 17),
                 Status = TournamentStatus.InProgress,
-                Games = new List<Game>()
+                Pairs = new List<TournamentPair>
+                {
+                    new()
+                    {
+                        PairInfo = new Pair 
+                        { 
+                            Player1 = new Player { Name = "Alice" }, 
+                            Player2 = new Player { Name = "Bob" } 
+                        },
+                        Games = new List<PairGame>()
+                    }
+                }
             },
             new Tournament
             {
@@ -322,7 +335,18 @@ public class TournamentServiceTests
                 StartDate = new DateTime(2025, 2, 15),
                 EndDate = new DateTime(2025, 2, 17),
                 Status = TournamentStatus.Completed,
-                Games = new List<Game>()
+                Pairs = new List<TournamentPair>
+                {
+                    new()
+                    {
+                        PairInfo = new Pair 
+                        { 
+                            Player1 = new Player { Name = "Charlie" }, 
+                            Player2 = new Player { Name = "David" } 
+                        },
+                        Games = new List<PairGame>()
+                    }
+                }
             },
             new Tournament
             {
@@ -334,19 +358,33 @@ public class TournamentServiceTests
                 StartDate = new DateTime(2025, 3, 15),
                 EndDate = new DateTime(2025, 3, 17),
                 Status = TournamentStatus.Upcoming,
-                Games = new List<Game>()
+                Pairs = new List<TournamentPair>
+                {
+                    new()
+                    {
+                        PairInfo = new Pair 
+                        { 
+                            Player1 = new Player { Name = "Eve" }, 
+                            Player2 = new Player { Name = "Frank" } 
+                        },
+                        Games = new List<PairGame>()
+                    }
+                }
             }
         };
     }
 
     private void SetupContainerMock(List<Tournament> tournaments)
     {
-        var iteratorMock = new Mock<FeedIterator<Tournament>>();
-        var responseMock = new Mock<FeedResponse<Tournament>>();
+        // Convert tournaments to compact format for mocking
+        var compactTournaments = tournaments.Select(TournamentCompactMapper.ToCompact).ToList();
+        
+        var iteratorMock = new Mock<FeedIterator<TournamentCompact>>();
+        var responseMock = new Mock<FeedResponse<TournamentCompact>>();
 
-        // Setup the response to return tournaments
-        responseMock.Setup(r => r.GetEnumerator()).Returns(tournaments.GetEnumerator());
-        responseMock.Setup(r => r.Resource).Returns(tournaments);
+        // Setup the response to return compact tournaments
+        responseMock.Setup(r => r.GetEnumerator()).Returns(compactTournaments.GetEnumerator());
+        responseMock.Setup(r => r.Resource).Returns(compactTournaments);
 
         // Setup iterator behavior - first call returns true, second call returns false
         var callCount = 0;
@@ -355,7 +393,7 @@ public class TournamentServiceTests
             .ReturnsAsync(responseMock.Object);
 
         // Setup container to return iterator
-        _containerMock.Setup(c => c.GetItemQueryIterator<Tournament>(
+        _containerMock.Setup(c => c.GetItemQueryIterator<TournamentCompact>(
             It.IsAny<QueryDefinition>(),
             It.IsAny<string>(),
             It.IsAny<QueryRequestOptions>()))

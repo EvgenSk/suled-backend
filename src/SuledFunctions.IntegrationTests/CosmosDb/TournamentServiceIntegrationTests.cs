@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using SuledFunctions.IntegrationTests.Infrastructure;
 using SuledFunctions.Models;
+using SuledFunctions.Models.Optimized;
 using SuledFunctions.Services;
 
 namespace SuledFunctions.IntegrationTests.CosmosDb;
@@ -300,46 +301,69 @@ public class TournamentServiceIntegrationTests : IAsyncLifetime
     public async Task GetTournamentsAsync_WithComplexGameData_ShouldPreserveStructure()
     {
         // Arrange
-        var player1 = new Player { Name = "John", Surname = "Doe" };
-        var player2 = new Player { Name = "Jane", Surname = "Smith" };
-        var pair1 = new Pair { Id = "pair-1", Player1 = player1, Player2 = player2 };
-        var pair2 = new Pair { Id = "pair-2", Player1 = player1, Player2 = player2 };
+        var pair1 = new Pair 
+        { 
+            Player1 = new Player { Name = "John", Surname = "Doe" },
+            Player2 = new Player { Name = "Jane", Surname = "Smith" }
+        };
+        var pair2 = new Pair 
+        { 
+            Player1 = new Player { Name = "Alice", Surname = "Brown" },
+            Player2 = new Player { Name = "Bob", Surname = "White" }
+        };
+        _ = pair1.Id; // Trigger ID generation
+        _ = pair2.Id;
 
         var tournament = CreateTestTournament("Tournament with Games");
-        tournament.Games = new List<Game>
+        tournament.Pairs = new List<TournamentPair>
         {
-            new Game 
-            { 
-                Id = "game-1", 
-                Pair1 = pair1, 
-                Pair2 = pair2, 
-                Round = 1, 
-                CourtNumber = 1, 
-                Status = GameStatus.Scheduled,
-                ScheduledTime = new DateTime(2025, 12, 1, 10, 0, 0)
+            new()
+            {
+                PairInfo = pair1,
+                Games = new List<PairGame>
+                {
+                    new() 
+                    { 
+                        Round = 1, 
+                        CourtNumber = 1, 
+                        OpponentPair = pair2,
+                        Status = GameStatus.Scheduled
+                    },
+                    new() 
+                    { 
+                        Round = 2, 
+                        CourtNumber = 2, 
+                        OpponentPair = pair2,
+                        Status = GameStatus.InProgress
+                    }
+                }
             },
-            new Game 
-            { 
-                Id = "game-2", 
-                Pair1 = pair1, 
-                Pair2 = pair2, 
-                Round = 1, 
-                CourtNumber = 2, 
-                Status = GameStatus.InProgress
+            new()
+            {
+                PairInfo = pair2,
+                Games = new List<PairGame>
+                {
+                    new() { Round = 1, CourtNumber = 1, OpponentPair = pair1, Status = GameStatus.Scheduled },
+                    new() { Round = 2, CourtNumber = 2, OpponentPair = pair1, Status = GameStatus.InProgress }
+                }
             }
         };
 
-        await _container.CreateItemAsync(tournament, new PartitionKey(tournament.Id));
+        // Convert to compact format before saving (this is what the upload function does)
+        var compactTournament = TournamentCompactMapper.ToCompact(tournament);
+        await _container.CreateItemAsync(compactTournament, new PartitionKey(compactTournament.Id));
 
         // Act
         var result = await _tournamentService.GetTournamentByIdAsync(tournament.Id);
 
         // Assert
         result.Should().NotBeNull();
-        result!.Games.Should().HaveCount(2);
-        result.Games[0].Pair1.Player1.Name.Should().Be("John");
-        result.Games[0].Status.Should().Be(GameStatus.Scheduled);
-        result.Games[1].Status.Should().Be(GameStatus.InProgress);
+        result!.Pairs.Should().HaveCount(2);
+        result.Pairs[0].PairInfo.Player1.Name.Should().Be("John");
+        result.Pairs[0].Games.Should().NotBeNull();
+        result.Pairs[0].Games.Should().HaveCount(2);
+        result.Pairs[0].Games![0].Status.Should().Be(GameStatus.Scheduled);
+        result.Pairs[0].Games![1].Status.Should().Be(GameStatus.InProgress);
     }
 
     #region Helper Methods
