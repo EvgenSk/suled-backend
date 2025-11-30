@@ -1,0 +1,64 @@
+using Microsoft.Azure.Cosmos;
+using Microsoft.Extensions.Logging;
+using SuledFunctions.Models;
+using SuledFunctions.Models.DTOs;
+
+namespace SuledFunctions.TelegramBot.Services;
+
+/// <summary>
+/// Service for pair-related operations
+/// </summary>
+public class PairService : IPairService
+{
+    private readonly Container _tournamentsContainer;
+    private readonly ILogger<PairService> _logger;
+
+    public PairService(
+        CosmosClient cosmosClient,
+        ILogger<PairService> logger,
+        string databaseName,
+        string tournamentsContainerName)
+    {
+        _logger = logger;
+        _tournamentsContainer = cosmosClient.GetContainer(databaseName, tournamentsContainerName);
+    }
+
+    public async Task<List<PairDto>> GetAllPairsAsync()
+    {
+        var query = new QueryDefinition("SELECT * FROM c WHERE c.Games != null");
+        var iterator = _tournamentsContainer.GetItemQueryIterator<Tournament>(query);
+        
+        var tournaments = new List<Tournament>();
+        while (iterator.HasMoreResults)
+        {
+            var results = await iterator.ReadNextAsync();
+            tournaments.AddRange(results);
+        }
+
+        // Extract unique pairs
+        var pairs = tournaments
+            .Where(t => t.Games != null)
+            .SelectMany(t => t.Games)
+            .SelectMany(g => new[] { g.Pair1, g.Pair2 })
+            .Where(p => p != null)
+            .GroupBy(p => p!.Id)
+            .Select(g => g.First()!)
+            .OrderBy(p => p.DisplayName)
+            .Select(p => new PairDto
+            {
+                Id = p.Id,
+                DisplayName = p.DisplayName,
+                Player1 = p.Player1.FullName,
+                Player2 = p.Player2.FullName
+            })
+            .ToList();
+
+        return pairs;
+    }
+
+    public async Task<PairDto?> GetPairByIdAsync(string pairId)
+    {
+        var allPairs = await GetAllPairsAsync();
+        return allPairs.FirstOrDefault(p => p.Id == pairId);
+    }
+}
