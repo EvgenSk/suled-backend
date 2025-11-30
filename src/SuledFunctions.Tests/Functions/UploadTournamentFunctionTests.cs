@@ -1,4 +1,6 @@
 using FluentAssertions;
+using FluentValidation;
+using FluentValidation.Results;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,6 +25,7 @@ public class UploadTournamentFunctionTests
     private readonly Mock<ILogger<UploadTournamentFunction>> _loggerMock;
     private readonly Mock<IExcelParserService> _excelParserMock;
     private readonly Mock<ITournamentRepository> _repositoryMock;
+    private readonly Mock<IValidator<Stream>> _fileValidatorMock;
     private readonly IOptions<TournamentSettings> _settings;
     private readonly UploadTournamentFunction _function;
 
@@ -31,16 +34,22 @@ public class UploadTournamentFunctionTests
         _loggerMock = new Mock<ILogger<UploadTournamentFunction>>();
         _excelParserMock = new Mock<IExcelParserService>();
         _repositoryMock = new Mock<ITournamentRepository>();
+        _fileValidatorMock = new Mock<IValidator<Stream>>();
         _settings = Options.Create(new TournamentSettings
         {
             RequestTimeoutSeconds = 30,
             MaxUploadSizeBytes = 10 * 1024 * 1024
         });
         
+        // Setup file validator to return valid by default
+        _fileValidatorMock.Setup(v => v.ValidateAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ValidationResult());
+        
         _function = new UploadTournamentFunction(
             _excelParserMock.Object, 
             _repositoryMock.Object,
             _settings,
+            _fileValidatorMock.Object,
             _loggerMock.Object);
         
         // Setup repository mock to succeed by default

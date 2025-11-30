@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
@@ -10,6 +11,7 @@ using SuledFunctions.Services.Interfaces;
 using SuledFunctions.Repositories;
 using SuledFunctions.Models.Optimized;
 using SuledFunctions.Models.DTOs;
+using SuledFunctions.Validators;
 
 namespace SuledFunctions.Functions;
 
@@ -22,17 +24,20 @@ public class UploadTournamentFunction
     private readonly ITournamentRepository _repository;
     private readonly ILogger<UploadTournamentFunction> _logger;
     private readonly TournamentSettings _settings;
+    private readonly IValidator<Stream> _fileValidator;
 
     public UploadTournamentFunction(
         IExcelParserService excelParser,
         ITournamentRepository repository,
         IOptions<TournamentSettings> settings,
+        IValidator<Stream> fileValidator,
         ILogger<UploadTournamentFunction> logger)
     {
         _excelParser = excelParser;
         _repository = repository;
         _logger = logger;
         _settings = settings.Value;
+        _fileValidator = fileValidator;
     }
 
     [Function("UploadTournament")]
@@ -46,14 +51,14 @@ public class UploadTournamentFunction
         if (!req.Headers.TryGetValues(Constants.Http.HeaderContentType, out var contentTypeValues))
         {
             _logger.LogWarning("Missing Content-Type header");
-            throw new ValidationException(Constants.Http.HeaderContentType, Constants.ErrorMessages.MissingContentType);
+            throw new Exceptions.ValidationException(Constants.Http.HeaderContentType, Constants.ErrorMessages.MissingContentType);
         }
 
         var contentType = contentTypeValues.FirstOrDefault();
         if (string.IsNullOrEmpty(contentType) || !contentType.Contains(Constants.Http.ContentTypeMultipartFormData, StringComparison.OrdinalIgnoreCase))
         {
             _logger.LogWarning("Invalid Content-Type: {ContentType}", contentType);
-            throw new ValidationException(Constants.Http.HeaderContentType, Constants.ErrorMessages.InvalidContentType);
+            throw new Exceptions.ValidationException(Constants.Http.HeaderContentType, Constants.ErrorMessages.InvalidContentType);
         }
 
         _logger.LogInformation("Request received");
@@ -76,36 +81,22 @@ public class UploadTournamentFunction
         
         _logger.LogInformation("Received {ByteCount} bytes", memoryStream.Length);
         
-        if (memoryStream.Length == 0)
-        {
-            _logger.LogWarning("Empty request body");
-            throw new ValidationException("file", Constants.ErrorMessages.EmptyFile);
-        }
-
-        if (memoryStream.Length > _settings.MaxUploadSizeBytes)
-        {
-            _logger.LogWarning("File size {ByteCount} exceeds maximum {MaxBytes}", memoryStream.Length, _settings.MaxUploadSizeBytes);
-            throw new ValidationException("file", $"File size exceeds maximum allowed size of {_settings.MaxUploadSizeBytes / (1024 * 1024)} MB");
-        }
-        
         memoryStream.Position = 0;
 
-        // Extract filename from Content-Disposition header if present
-        var fileName = Constants.Files.DefaultTournamentFileName;
-        if (req.Headers.TryGetValues(Constants.Http.HeaderContentDisposition, out var dispositionValues))
+        // Validate file using FileUploadValidator
+        var validationResult = await _fileValidator.ValidateAsync(memoryStream);
+        if (!validationResult.IsValid)
         {
-            var contentDisposition = dispositionValues.FirstOrDefault();
-            if (!string.IsNullOrEmpty(contentDisposition))
-            {
-                // Extract filename from Content-Disposition header (e.g., "attachment; filename="my-file.xlsx"")
-                var fileNameMatch = System.Text.RegularExpressions.Regex.Match(contentDisposition, @"filename=""?([^""]+)""?");
-                if (fileNameMatch.Success)
-                {
-                    fileName = fileNameMatch.Groups[1].Value;
-                    _logger.LogInformation("Extracted filename from Content-Disposition: {FileName}", fileName);
-                }
-            }
+            var errors = validationResult.Errors
+                .GroupBy(e => e.PropertyName)
+                .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
+
+            throw new Exceptions.ValidationException("File validation failed", errors);
         }
+
+        // Extract filename from Content-Disposition header if present
+        var fileName = ExtractFileName(req);
+        _logger.LogInformation("Processing file: {FileName}", fileName);
 
         _logger.LogInformation("Parsing tournament from file");
         
@@ -146,5 +137,23 @@ public class UploadTournamentFunction
             _logger.LogError(ex, "Error parsing or saving tournament");
             throw new FileProcessingException(Constants.ErrorMessages.ProcessingError, ex, fileName);
         }
+    }
+
+    private string ExtractFileName(HttpRequestData req)
+    {
+        if (req.Headers.TryGetValues(Constants.Http.HeaderContentDisposition, out var dispositionValues))
+        {
+            var contentDisposition = dispositionValues.FirstOrDefault();
+            if (!string.IsNullOrEmpty(contentDisposition))
+            {
+                // Extract filename from Content-Disposition header (e.g., "attachment; filename="my-file.xlsx"")
+                var fileNameMatch = System.Text.RegularExpressions.Regex.Match(contentDisposition, @"filename=""?([^""]+)""?");
+                if (fileNameMatch.Success)
+                {
+                    return fileNameMatch.Groups[1].Value;
+                }
+            }
+        }
+        return Constants.Files.DefaultTournamentFileName;
     }
 }
