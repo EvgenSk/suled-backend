@@ -100,17 +100,17 @@ public static class TournamentCompactMapper
             {
                 Player1 = new Player
                 {
-                    Name = compactPair.Player1[0],
-                    Surname = string.IsNullOrWhiteSpace(compactPair.Player1[1]) 
-                        ? null 
-                        : compactPair.Player1[1]
+                    Name = compactPair.Player1?.Length > 0 ? compactPair.Player1[0] : string.Empty,
+                    Surname = compactPair.Player1?.Length > 1 && !string.IsNullOrWhiteSpace(compactPair.Player1[1]) 
+                        ? compactPair.Player1[1] 
+                        : null
                 },
                 Player2 = new Player
                 {
-                    Name = compactPair.Player2[0],
-                    Surname = string.IsNullOrWhiteSpace(compactPair.Player2[1]) 
-                        ? null 
-                        : compactPair.Player2[1]
+                    Name = compactPair.Player2?.Length > 0 ? compactPair.Player2[0] : string.Empty,
+                    Surname = compactPair.Player2?.Length > 1 && !string.IsNullOrWhiteSpace(compactPair.Player2[1]) 
+                        ? compactPair.Player2[1] 
+                        : null
                 }
             };
             
