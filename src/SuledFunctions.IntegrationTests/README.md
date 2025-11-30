@@ -4,12 +4,20 @@ This project contains integration tests for the Suled backend Azure Functions. T
 
 ## Prerequisites
 
+### For Testcontainers-based tests:
 - [Docker Desktop](https://www.docker.com/products/docker-desktop) (required for Testcontainers)
-- .NET 8.0 SDK or later
 - Windows with WSL2 enabled (for Docker on Windows)
 
+### For Local Cosmos DB Emulator tests:
+- [Azure Cosmos DB Emulator](https://learn.microsoft.com/en-us/azure/cosmos-db/local-emulator) installed and running
+- No Docker required
+
+### General:
+- .NET 8.0 SDK or later
+
 **⚠️ Known Limitations:**
-- **Cosmos DB Emulator**: The Linux Cosmos DB emulator has significant startup delays (2+ minutes) and may hang during initialization. Tests are functional but extremely slow. For faster integration testing, consider using a real Azure Cosmos DB instance or mocking Cosmos DB operations.
+- **Cosmos DB Emulator (Testcontainers)**: The Linux Cosmos DB emulator has significant startup delays (2+ minutes) and may hang during initialization. Tests using Testcontainers are functional but extremely slow.
+- **Cosmos DB Emulator (Local)**: For faster integration testing, use the locally running Cosmos DB Emulator. Tests are fast and reliable when the emulator is already running.
 - **Blob Storage Tests**: Fast and reliable (~9 seconds for all 6 tests)
 
 ## Test Structure
@@ -32,6 +40,24 @@ SuledFunctions.IntegrationTests/
 
 ## Running Tests
 
+### Quick Start: Local Cosmos DB Emulator Tests
+
+**Recommended for fast iteration during development:**
+
+1. Start the Cosmos DB Emulator (if not already running)
+2. Run the setup script to create the database:
+   ```powershell
+   cd ..\..\scripts
+   .\setup-cosmos-emulator.ps1
+   ```
+
+3. Run the local Cosmos DB tests:
+   ```powershell
+   dotnet test --filter "FullyQualifiedName~CosmosDbLocal"
+   ```
+
+These tests are **fast** (no container startup time) and connect to your locally running emulator at `https://localhost:8081`.
+
 ### All Integration Tests
 
 ```powershell
@@ -44,8 +70,14 @@ dotnet test
 # Run only blob storage tests
 dotnet test --filter "FullyQualifiedName~BlobStorage"
 
-# Run only Cosmos DB tests
+# Run only Cosmos DB tests (Testcontainers - slow)
 dotnet test --filter "FullyQualifiedName~CosmosDb"
+
+# Run only local Cosmos DB tests (fast - requires emulator running)
+dotnet test --filter "FullyQualifiedName~CosmosDbLocal"
+
+# Run only TournamentService integration tests
+dotnet test --filter "FullyQualifiedName~TournamentServiceIntegration"
 
 # Run only end-to-end tests
 dotnet test --filter "FullyQualifiedName~EndToEnd"
@@ -57,14 +89,66 @@ dotnet test --filter "FullyQualifiedName~EndToEnd"
 dotnet test --filter "FullyQualifiedName~TournamentWorkflowTests.EndToEnd_UploadAndParseTournament_ShouldCompleteSuccessfully"
 ```
 
+## Local Cosmos DB Emulator Setup
+
+**This is the recommended approach for integration tests during development.**
+
+### First-Time Setup
+
+1. **Install Azure Cosmos DB Emulator** (if not already installed):
+   - Download from: https://aka.ms/cosmosdb-emulator
+   - Or install via Chocolatey: `choco install azure-cosmosdb-emulator`
+
+2. **Start the Emulator**:
+   - Launch from Start menu: "Azure Cosmos DB Emulator"
+   - Or via PowerShell: `Start-Process "C:\Program Files\Azure Cosmos DB Emulator\Microsoft.Azure.Cosmos.Emulator.exe"`
+   - Wait for the emulator to fully start (system tray icon will show green)
+
+3. **Create Test Database**:
+   ```powershell
+   cd scripts
+   .\setup-cosmos-emulator.ps1
+   ```
+   
+   This script creates the `TournamentDb` database and `Tournaments` container.
+
+### Running Tests
+
+Once the emulator is running, you can run tests repeatedly without any startup delay:
+
+```powershell
+# Run all local Cosmos DB tests
+dotnet test --filter "FullyQualifiedName~CosmosDbLocal"
+
+# Run specific test class
+dotnet test --filter "FullyQualifiedName~TournamentServiceIntegrationTests"
+
+# Run a specific test
+dotnet test --filter "Name~GetTournamentByIdAsync_WithExistingTournament_ShouldReturnTournament"
+```
+
+### Benefits
+
+- ⚡ **Fast**: No container startup time (tests run in ~13 seconds total)
+- 🔄 **Reliable**: No Docker dependencies or network issues
+- 💻 **Local**: Works offline
+- 🔍 **Debuggable**: Can inspect data in Cosmos DB Emulator Data Explorer
+- 🎯 **Real**: Uses the actual Cosmos DB SDK and query engine
+
+### Data Explorer
+
+View and manage test data at:
+https://localhost:8081/_explorer/index.html
+
 ## How It Works
 
 ### Test Fixtures
 
 Integration tests use xUnit's `ICollectionFixture` to share test infrastructure:
 
+- **LocalCosmosDbFixture**: Connects to locally running Cosmos DB Emulator (fast, recommended)
 - **AzuriteFixture**: Spins up Azurite container (local Azure Storage emulator)
-- **CosmosDbFixture**: Spins up Cosmos DB emulator container
+- **CosmosDbFixture**: Spins up Cosmos DB emulator container (slow, not recommended)
 - **TestCollections**: Defines test collections that share fixtures
 
 ### Test Execution Flow
@@ -101,7 +185,7 @@ The tests will automatically:
 - ✅ Blob metadata
 - ✅ Large file uploads (5MB+)
 
-### CosmosDbIntegrationTests (8 tests)
+### CosmosDbIntegrationTests (8 tests) - DISABLED (Slow Testcontainers)
 - ✅ Create documents
 - ✅ Read documents
 - ✅ Query documents
@@ -110,7 +194,33 @@ The tests will automatically:
 - ✅ Nested data structures
 - ✅ Partition key queries
 
-### TournamentWorkflowTests (7 tests)
+### CosmosDbLocalIntegrationTests (10 tests) - **RECOMMENDED**
+Uses locally running Cosmos DB Emulator for fast execution:
+- ✅ Create documents
+- ✅ Read documents
+- ✅ Query documents (multiple items, filtering)
+- ✅ Update documents
+- ✅ Delete documents
+- ✅ Nested data structures (games, pairs, players)
+- ✅ Partition key queries
+- ✅ Metadata preservation
+- ✅ Bulk operations
+
+### TournamentServiceIntegrationTests (11 tests) - **RECOMMENDED**
+Tests the TournamentService with real Cosmos DB operations:
+- ✅ Get tournament by ID
+- ✅ Get all tournaments
+- ✅ Filter by date range
+- ✅ Filter by location
+- ✅ Filter by division
+- ✅ Filter by status
+- ✅ Multiple combined filters
+- ✅ Max results limiting
+- ✅ Ordering by start date
+- ✅ Complex nested game data
+- ✅ Handle non-existing tournaments
+
+### TournamentWorkflowTests (7 tests) - DISABLED (Slow Testcontainers)
 - ✅ Upload Excel → Parse → Store → Retrieve
 - ✅ Extract unique pairs from tournaments
 - ✅ Filter games by pair ID
@@ -120,7 +230,19 @@ The tests will automatically:
 
 ## Troubleshooting
 
-### Docker Not Running
+### Cosmos DB Emulator Not Running
+
+```
+Failed to connect to Cosmos DB Emulator
+```
+
+**Solution**: 
+1. Start the Azure Cosmos DB Emulator from the Start menu, or
+2. Run `Start-Process "C:\Program Files\Azure Cosmos DB Emulator\Microsoft.Azure.Cosmos.Emulator.exe"`
+3. Wait for the emulator to fully start (check the system tray icon)
+4. Run the setup script: `.\scripts\setup-cosmos-emulator.ps1`
+
+### Docker Not Running (for Testcontainer tests)
 
 ```
 Error: Docker endpoint not found
@@ -169,10 +291,17 @@ Add to `.github/workflows/backend-ci.yml`:
 
 ## Performance
 
-Typical execution times:
-- **Setup**: 5-15 seconds (container startup)
+### Local Cosmos DB Emulator Tests (Recommended)
+- **Setup**: <1 second (connection to running emulator)
+- **Per test**: 50-200ms
+- **CosmosDbLocalIntegrationTests (10 tests)**: ~5 seconds
+- **TournamentServiceIntegrationTests (11 tests)**: ~8 seconds
+- **Total**: ~13 seconds
+
+### Testcontainers Tests (Slow - Not Recommended)
+- **Setup**: 60-120 seconds (container startup + emulator initialization)
 - **Per test**: 50-500ms
-- **Total suite**: ~30-60 seconds
+- **Total suite**: ~2-3 minutes
 
 ## Best Practices
 

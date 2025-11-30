@@ -29,3 +29,14 @@ public class IntegrationTestCollection : ICollectionFixture<AzuriteFixture>, ICo
     // This class has no code, and is never created.
     // Its purpose is simply to be the place to apply [CollectionDefinition]
 }
+
+/// <summary>
+/// Collection definition for integration tests that use a locally running Cosmos DB Emulator
+/// Requires Cosmos DB Emulator to be running at https://localhost:8081
+/// </summary>
+[CollectionDefinition("LocalCosmosDb")]
+public class LocalCosmosDbCollection : ICollectionFixture<LocalCosmosDbFixture>
+{
+    // This class has no code, and is never created.
+    // Its purpose is simply to be the place to apply [CollectionDefinition]
+}

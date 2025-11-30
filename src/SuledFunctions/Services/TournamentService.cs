@@ -39,75 +39,54 @@ public class TournamentService : ITournamentService
         {
             var container = _cosmosClient.GetContainer(_databaseName, _containerName);
             
-            // Build query
-            var queryText = "SELECT * FROM c WHERE 1=1";
-            var queryDefinition = new QueryDefinition(queryText);
-            
-            // Add filters
+            // Build query with filters
             var whereClauses = new List<string>();
             
             if (startDateFrom.HasValue)
             {
-                whereClauses.Add("c.StartDate >= @startDateFrom");
-                queryDefinition = queryDefinition.WithParameter("@startDateFrom", startDateFrom.Value);
+                whereClauses.Add("c.startDate >= @startDateFrom");
             }
             
             if (startDateTo.HasValue)
             {
-                whereClauses.Add("c.StartDate <= @startDateTo");
-                queryDefinition = queryDefinition.WithParameter("@startDateTo", startDateTo.Value);
+                whereClauses.Add("c.startDate <= @startDateTo");
             }
             
             if (!string.IsNullOrWhiteSpace(location))
             {
-                whereClauses.Add("CONTAINS(LOWER(c.Location), @location)");
-                queryDefinition = queryDefinition.WithParameter("@location", location.ToLower());
+                whereClauses.Add("CONTAINS(c.location, @location, true)");
             }
             
             if (!string.IsNullOrWhiteSpace(division))
             {
-                whereClauses.Add("CONTAINS(LOWER(c.Division), @division)");
-                queryDefinition = queryDefinition.WithParameter("@division", division.ToLower());
+                whereClauses.Add("CONTAINS(c.division, @division, true)");
             }
             
             if (status.HasValue)
             {
-                whereClauses.Add("c.Status = @status");
-                queryDefinition = queryDefinition.WithParameter("@status", (int)status.Value);
+                whereClauses.Add("c.status = @status");
             }
             
-            if (whereClauses.Any())
-            {
-                queryText = $"SELECT * FROM c WHERE {string.Join(" AND ", whereClauses)}";
-                queryDefinition = new QueryDefinition(queryText);
-                
-                // Re-add all parameters
-                if (startDateFrom.HasValue)
-                    queryDefinition = queryDefinition.WithParameter("@startDateFrom", startDateFrom.Value);
-                if (startDateTo.HasValue)
-                    queryDefinition = queryDefinition.WithParameter("@startDateTo", startDateTo.Value);
-                if (!string.IsNullOrWhiteSpace(location))
-                    queryDefinition = queryDefinition.WithParameter("@location", location.ToLower());
-                if (!string.IsNullOrWhiteSpace(division))
-                    queryDefinition = queryDefinition.WithParameter("@division", division.ToLower());
-                if (status.HasValue)
-                    queryDefinition = queryDefinition.WithParameter("@status", (int)status.Value);
-            }
+            // Build the complete query text (without ORDER BY to avoid issues with nullable fields)
+            var queryText = whereClauses.Any() 
+                ? $"SELECT * FROM c WHERE {string.Join(" AND ", whereClauses)}"
+                : "SELECT * FROM c";
             
-            queryText += " ORDER BY c.StartDate DESC";
-            queryDefinition = new QueryDefinition(queryText);
+            // Create query definition and add all parameters
+            var queryDefinition = new QueryDefinition(queryText);
             
-            // Re-add parameters one more time for the final query
             if (startDateFrom.HasValue)
                 queryDefinition = queryDefinition.WithParameter("@startDateFrom", startDateFrom.Value);
             if (startDateTo.HasValue)
                 queryDefinition = queryDefinition.WithParameter("@startDateTo", startDateTo.Value);
             if (!string.IsNullOrWhiteSpace(location))
-                queryDefinition = queryDefinition.WithParameter("@location", location.ToLower());
+                queryDefinition = queryDefinition.WithParameter("@location", location);
             if (!string.IsNullOrWhiteSpace(division))
-                queryDefinition = queryDefinition.WithParameter("@division", division.ToLower());
+                queryDefinition = queryDefinition.WithParameter("@division", division);
             if (status.HasValue)
                 queryDefinition = queryDefinition.WithParameter("@status", (int)status.Value);
+
+            _logger.LogInformation("Executing query: {Query}", queryText);
 
             var tournaments = new List<Tournament>();
             using var iterator = container.GetItemQueryIterator<Tournament>(
@@ -120,8 +99,14 @@ public class TournamentService : ITournamentService
                 tournaments.AddRange(response);
             }
 
-            _logger.LogInformation("Retrieved {Count} tournaments", tournaments.Count);
-            return tournaments;
+            // Sort by StartDate in memory (descending - most recent first)
+            var sortedTournaments = tournaments
+                .OrderByDescending(t => t.StartDate ?? DateTime.MinValue)
+                .Take(maxResults)
+                .ToList();
+
+            _logger.LogInformation("Retrieved {Count} tournaments", sortedTournaments.Count);
+            return sortedTournaments;
         }
         catch (Exception ex)
         {
