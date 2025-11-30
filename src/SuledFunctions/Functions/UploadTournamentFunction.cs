@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using System.Net;
 using SuledFunctions.Services.Interfaces;
 using Microsoft.Azure.Cosmos;
+using SuledFunctions.Models.Optimized;
 
 namespace SuledFunctions.Functions;
 
@@ -109,13 +110,16 @@ public class UploadTournamentFunction
             // Parse the tournament
             var tournament = await _excelParser.ParseTournamentAsync(memoryStream, fileName);
 
-            // Save to Cosmos DB
+            // Convert to compact format for storage (80-94% size reduction)
+            var compactTournament = TournamentCompactMapper.ToCompact(tournament);
+
+            // Save compact format to Cosmos DB
             var database = cosmosClient.GetDatabase(Environment.GetEnvironmentVariable("CosmosDbName"));
             var container = database.GetContainer(Environment.GetEnvironmentVariable("CosmosContainerName"));
-            await container.CreateItemAsync(tournament, new PartitionKey(tournament.Id));
+            await container.CreateItemAsync(compactTournament, new PartitionKey(compactTournament.Id));
 
-            _logger.LogInformation("Tournament {TournamentId} saved to Cosmos DB with {GameCount} games",
-                tournament.Id, tournament.Games.Count);
+            _logger.LogInformation("Tournament {TournamentId} saved to Cosmos DB in compact format with {PairCount} pairs",
+                tournament.Id, tournament.Pairs.Count);
 
             // Create success response
             var response = req.CreateResponse(HttpStatusCode.Created);

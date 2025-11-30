@@ -3,6 +3,7 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using System.Net;
 using SuledFunctions.Models;
+using SuledFunctions.Models.Optimized;
 
 namespace SuledFunctions.Functions;
 
@@ -29,11 +30,11 @@ public class GetTournamentFunction
             Connection = "CosmosDbConnection",
             Id = "{id}",
             PartitionKey = "{id}")]
-        Tournament? tournament)
+        TournamentCompact? compactTournament)
     {
         _logger.LogInformation("Getting tournament with ID: {TournamentId}", id);
 
-        if (tournament == null)
+        if (compactTournament == null)
         {
             _logger.LogWarning("Tournament not found: {TournamentId}", id);
             var notFoundResponse = req.CreateResponse(HttpStatusCode.NotFound);
@@ -43,6 +44,9 @@ public class GetTournamentFunction
 
         try
         {
+            // Expand compact format to full Tournament for API response
+            var tournament = TournamentCompactMapper.FromCompact(compactTournament);
+            
             var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(tournament);
             return response;

@@ -1,6 +1,7 @@
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
 using SuledFunctions.Models;
+using SuledFunctions.Models.Optimized;
 using SuledFunctions.Services.Interfaces;
 
 namespace SuledFunctions.Services;
@@ -88,16 +89,19 @@ public class TournamentService : ITournamentService
 
             _logger.LogInformation("Executing query: {Query}", queryText);
 
-            var tournaments = new List<Tournament>();
-            using var iterator = container.GetItemQueryIterator<Tournament>(
+            var compactTournaments = new List<TournamentCompact>();
+            using var iterator = container.GetItemQueryIterator<TournamentCompact>(
                 queryDefinition,
                 requestOptions: new QueryRequestOptions { MaxItemCount = maxResults });
 
-            while (iterator.HasMoreResults && tournaments.Count < maxResults)
+            while (iterator.HasMoreResults && compactTournaments.Count < maxResults)
             {
                 var response = await iterator.ReadNextAsync();
-                tournaments.AddRange(response);
+                compactTournaments.AddRange(response);
             }
+
+            // Expand compact format to full Tournament models
+            var tournaments = compactTournaments.Select(TournamentCompactMapper.FromCompact).ToList();
 
             // Sort by StartDate in memory (descending - most recent first)
             var sortedTournaments = tournaments
@@ -120,8 +124,8 @@ public class TournamentService : ITournamentService
         try
         {
             var container = _cosmosClient.GetContainer(_databaseName, _containerName);
-            var response = await container.ReadItemAsync<Tournament>(id, new PartitionKey(id));
-            return response.Resource;
+            var response = await container.ReadItemAsync<TournamentCompact>(id, new PartitionKey(id));
+            return TournamentCompactMapper.FromCompact(response.Resource);
         }
         catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
