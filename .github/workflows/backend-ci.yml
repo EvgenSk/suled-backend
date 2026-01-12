@@ -16,8 +16,9 @@ on:
 
 env:
   DOTNET_VERSION: '8.0.x'
-  AZURE_FUNCTIONAPP_NAME: 'suled-app-func'  # Updated to match deployed function app
+  AZURE_FUNCTIONAPP_NAME: 'suled-app-func'
   AZURE_FUNCTIONAPP_PACKAGE_PATH: './src/SuledFunctions'
+  AZURE_RG: 'suled-rg-dev'
 
 jobs:
   build-and-test:
