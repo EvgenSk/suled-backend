@@ -56,13 +56,13 @@ resource cosmosDbAccount 'Microsoft.DocumentDB/databaseAccounts@2025-04-15' = {
       {
         locationName: location
         failoverPriority: 0
-        isZoneRedundant: false
       }
     ]
     enableAutomaticFailover: false
     enableMultipleWriteLocations: false
     disableKeyBasedMetadataWriteAccess: false
     publicNetworkAccess: 'Enabled'
+    enableFreeTier: true
   }
 }
 
@@ -97,7 +97,7 @@ resource cosmosContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/con
   }
 }
 
-// App Service Plan for Function App
+// App Service Plan for Function App (Consumption/Free tier - 1M executions free/month)
 resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {
   name: '${appName}-plan'
   location: location
