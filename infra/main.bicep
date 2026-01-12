@@ -56,13 +56,13 @@ resource cosmosDbAccount 'Microsoft.DocumentDB/databaseAccounts@2025-04-15' = {
       {
         locationName: location
         failoverPriority: 0
-        isZoneRedundant: false
       }
     ]
     enableAutomaticFailover: false
     enableMultipleWriteLocations: false
     disableKeyBasedMetadataWriteAccess: false
     publicNetworkAccess: 'Enabled'
+    enableFreeTier: true
   }
 }
 
