@@ -19,14 +19,12 @@ public record PairCompact
     /// Player 1 as array: [name, surname].
     /// Empty string for surname if not present.
     /// </summary>
-    [JsonPropertyName("p1")]
     public string[] Player1 { get; set; } = Array.Empty<string>();
     
     /// <summary>
     /// Player 2 as array: [name, surname].
     /// Empty string for surname if not present.
     /// </summary>
-    [JsonPropertyName("p2")]
     public string[] Player2 { get; set; } = Array.Empty<string>();
     
     /// <summary>

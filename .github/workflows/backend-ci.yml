@@ -16,9 +16,7 @@ on:
 
 env:
   DOTNET_VERSION: '8.0.x'
-  AZURE_FUNCTIONAPP_NAME: 'suled-xiprdpedesda2-func'
   AZURE_FUNCTIONAPP_PACKAGE_PATH: './src/SuledFunctions'
-  AZURE_RG: 'suled-rg-dev'
 
 jobs:
   build-and-test:
@@ -73,6 +71,8 @@ jobs:
     if: github.ref == 'refs/heads/develop'  # Deploy to dev when pushing to develop
     environment:
       name: 'Development'
+    environment:
+      name: 'Development'
       url: ${{ steps.deploy-to-function.outputs.webapp-url }}
 
     steps:
@@ -90,9 +90,7 @@ jobs:
       id: deploy-to-function
       uses: Azure/functions-action@v1
       with:
-        app-name: suled-app-func
-        package: ./publish
-        publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE_DEV }}
+        app-name: ${{ vars.AZURE_FUNCTIONAPP_NAME_DEV }}rets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE_DEV }}
         scm-do-build-during-deployment: false
         enable-oryx-build: false
 
@@ -119,15 +117,17 @@ jobs:
       id: deploy-to-function
       uses: Azure/functions-action@v1
       with:
-        app-name: suled-app-func
+        app-name: ${{ vars.AZURE_FUNCTIONAPP_NAME_PROD }}
         package: ./publish
-        publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
+        publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE_PROD }}
         scm-do-build-during-deployment: false
         enable-oryx-build: false
 
   infrastructure:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
+    environment:
+      name: 'Production'
     
     steps:
     - name: Checkout code
@@ -141,8 +141,8 @@ jobs:
     - name: Deploy Bicep
       uses: azure/arm-deploy@v1
       with:
-        subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-        resourceGroupName: ${{ secrets.AZURE_RG }}
+        subscriptionId: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+        resourceGroupName: ${{ vars.AZURE_RESOURCE_GROUP }}
         template: ./infra/main.bicep
         parameters: ./infra/main.bicepparam
         failOnStdErr: false

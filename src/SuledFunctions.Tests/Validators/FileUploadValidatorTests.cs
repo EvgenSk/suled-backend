@@ -1,6 +1,8 @@
 using FluentAssertions;
 using SuledFunctions.Validators;
 using System.Text;
+using Microsoft.Extensions.Options;
+using SuledFunctions.Configuration;
 
 namespace SuledFunctions.Tests.Validators;
 
@@ -10,7 +12,10 @@ public class FileUploadValidatorTests
 
     public FileUploadValidatorTests()
     {
-        _validator = new FileUploadValidator(10 * 1024 * 1024); // 10MB max
+        _validator = new FileUploadValidator(Options.Create(new TournamentSettings
+        {
+            MaxUploadSizeBytes = 10 * 1024 * 1024
+        })); // 10MB max
     }
 
     [Fact]

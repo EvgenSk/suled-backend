@@ -1,4 +1,6 @@
 using FluentValidation;
+using Microsoft.Extensions.Options;
+using SuledFunctions.Configuration;
 
 namespace SuledFunctions.Validators;
 
@@ -10,9 +12,9 @@ public class FileUploadValidator : AbstractValidator<Stream>
     private readonly long _maxSizeBytes;
     private static readonly string[] AllowedExtensions = { ".xlsx", ".xls" };
 
-    public FileUploadValidator(long maxSizeBytes)
+    public FileUploadValidator(IOptions<TournamentSettings> settings)
     {
-        _maxSizeBytes = maxSizeBytes;
+        _maxSizeBytes = settings.Value.MaxUploadSizeBytes;
 
         RuleFor(stream => stream)
             .NotNull()
