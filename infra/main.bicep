@@ -10,6 +10,12 @@ param appName string = 'suled-${uniqueString(resourceGroup().id)}'
 @description('Environment name (dev, test, prod)')
 param environment string = 'dev'
 
+@description('Allowed CORS origins for the Function App')
+param allowedOrigins array = [
+  'http://localhost:5173'
+  'http://localhost:5174'
+]
+
 // Storage Account for Function App and Blobs
 resource storageAccount 'Microsoft.Storage/storageAccounts@2025-01-01' = {
   name: '${replace(appName, '-', '')}st'
@@ -119,6 +125,10 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
   properties: {
     serverFarmId: appServicePlan.id
     siteConfig: {
+      cors: {
+        allowedOrigins: allowedOrigins
+        supportCredentials: false
+      }
       appSettings: [
         {
           name: 'AzureWebJobsStorage'
