@@ -71,8 +71,6 @@ jobs:
     if: github.ref == 'refs/heads/develop'  # Deploy to dev when pushing to develop
     environment:
       name: 'Development'
-    environment:
-      name: 'Development'
       url: ${{ steps.deploy-to-function.outputs.webapp-url }}
 
     steps:
