@@ -38,7 +38,7 @@ jobs:
       run: dotnet build --configuration Release --no-restore
 
     - name: Run tests
-      run: dotnet test --configuration Release --no-build --verbosity normal --filter "FullyQualifiedName!~IntegrationTests" --collect:"XPlat Code Coverage"
+      run: dotnet test --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage"
 
     - name: Upload coverage reports
       uses: codecov/codecov-action@v4
