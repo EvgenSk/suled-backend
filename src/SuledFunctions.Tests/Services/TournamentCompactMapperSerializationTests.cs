@@ -48,8 +48,8 @@ public class TournamentCompactMapperSerializationTests
         // Assert
         Assert.Contains("\"id\":\"test-123\"", json);
         Assert.Contains("\"name\":\"Test Tournament\"", json);
-        Assert.Contains("\"p1\":[\"John\",\"Doe\"]", json);
-        Assert.Contains("\"p2\":[\"Jane\",\"\"]", json);
+        Assert.Contains("\"player1\":[\"John\",\"Doe\"]", json);
+        Assert.Contains("\"player2\":[\"Jane\",\"\"]", json);
         Assert.Contains("\"games\":[[1,6,2],[2,7,3]]", json);
     }
 
@@ -71,8 +71,8 @@ public class TournamentCompactMapperSerializationTests
             ""pairs"": [
                 {
                     ""id"": 1,
-                    ""p1"": [""John"", ""Doe""],
-                    ""p2"": [""Jane"", """"],
+                    ""player1"": [""John"", ""Doe""],
+                    ""player2"": [""Jane"", """"],
                     ""games"": [[1, 6, 2], [2, 7, 3]]
                 }
             ]
@@ -111,10 +111,10 @@ public class TournamentCompactMapperSerializationTests
         var json = JsonSerializer.Serialize(pair, _jsonOptions);
 
         // Assert
-        Assert.Contains("\"p1\"", json);
-        Assert.Contains("\"p2\"", json);
-        Assert.DoesNotContain("\"player1\"", json.ToLower());
-        Assert.DoesNotContain("\"player2\"", json.ToLower());
+        Assert.Contains("\"player1\"", json);
+        Assert.Contains("\"player2\"", json);
+        Assert.DoesNotContain("\"p1\"", json);
+        Assert.DoesNotContain("\"p2\"", json);
     }
 
     [Fact]

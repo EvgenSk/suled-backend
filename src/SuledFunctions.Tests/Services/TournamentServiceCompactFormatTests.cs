@@ -262,11 +262,11 @@ public class TournamentServiceCompactFormatTests
         var json = JsonSerializer.Serialize(compact, jsonOptions);
 
         // Assert - verify compact structure
-        json.Should().Contain("\"p1\":");
-        json.Should().Contain("\"p2\":");
+        json.Should().Contain("\"player1\":");
+        json.Should().Contain("\"player2\":");
         json.Should().NotContain("\"displayName\":");
         // Note: "gameCount" can appear in TournamentRound, so we check specifically for pair's gameCount
-        json.Should().NotMatch("*\"p1\":*\"gameCount\":*").And.NotMatch("*\"p2\":*\"gameCount\":*");
+        json.Should().NotMatch("*\"player1\":*\"gameCount\":*").And.NotMatch("*\"player2\":*\"gameCount\":*");
         
         // Verify can deserialize back
         var deserialized = JsonSerializer.Deserialize<TournamentCompact>(json, jsonOptions);
