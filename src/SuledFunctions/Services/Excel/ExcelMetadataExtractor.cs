@@ -172,14 +172,19 @@ public class ExcelMetadataExtractor : IExcelMetadataExtractor
         }
         
         var now = DateTime.UtcNow;
-        var startDate = tournament.StartDate.Value;
-        var endDate = tournament.EndDate ?? startDate;
+        var startDate = tournament.StartDate.Value.Date;
+        // When no explicit end date, treat the tournament as running for the full calendar day
+        // (end = start of next day). This avoids spuriously marking same-day tournaments
+        // as Completed the moment they are uploaded, since StartDate is midnight.
+        var endDate = tournament.EndDate.HasValue
+            ? tournament.EndDate.Value
+            : startDate.AddDays(1);
         
         if (now < startDate)
         {
             tournament.Status = TournamentStatus.Upcoming;
         }
-        else if (now > endDate)
+        else if (now >= endDate)
         {
             tournament.Status = TournamentStatus.Completed;
         }
