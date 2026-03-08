@@ -5,6 +5,7 @@ using SuledFunctions.Exceptions;
 using SuledFunctions.Models;
 using SuledFunctions.Models.Optimized;
 using SuledFunctions.Repositories;
+using SuledFunctions.Services.Excel.Interfaces;
 using SuledFunctions.Services.Interfaces;
 
 namespace SuledFunctions.Services;
@@ -15,15 +16,18 @@ namespace SuledFunctions.Services;
 public class TournamentService : ITournamentService
 {
     private readonly ITournamentRepository _repository;
+    private readonly IExcelMetadataExtractor _metadataExtractor;
     private readonly ILogger<TournamentService> _logger;
     private readonly TournamentSettings _settings;
 
     public TournamentService(
         ITournamentRepository repository,
+        IExcelMetadataExtractor metadataExtractor,
         IOptions<TournamentSettings> settings,
         ILogger<TournamentService> logger)
     {
         _repository = repository;
+        _metadataExtractor = metadataExtractor;
         _logger = logger;
         _settings = settings.Value;
     }
@@ -52,6 +56,15 @@ public class TournamentService : ITournamentService
 
             // Expand compact format to full Tournament models
             var tournaments = compactTournaments.Select(TournamentCompactMapper.FromCompact).ToList();
+
+            // Recompute status at query time so it always reflects current reality,
+            // regardless of when the tournament was originally uploaded.
+            foreach (var t in tournaments)
+                _metadataExtractor.DetermineStatus(t);
+
+            // Apply status filter after recomputing (status stored in DB may be stale)
+            if (querySpec.Status.HasValue)
+                tournaments = tournaments.Where(t => t.Status == querySpec.Status.Value).ToList();
 
             // Sort by StartDate in memory (descending - most recent first)
             var sortedTournaments = tournaments
