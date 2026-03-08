@@ -74,6 +74,8 @@ public class GetTournamentsFunction
             Name = t.Name,
             StartDate = t.StartDate,
             EndDate = t.EndDate,
+            StartTime = t.StartTime,
+            EndTime = t.EndTime,
             Location = t.Location,
             Division = t.Division,
             Description = t.Description,

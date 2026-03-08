@@ -28,6 +28,12 @@ public record TournamentListDto
     [JsonPropertyName("description")]
     public string Description { get; init; } = string.Empty;
     
+    [JsonPropertyName("startTime")]
+    public TimeSpan? StartTime { get; init; }
+    
+    [JsonPropertyName("endTime")]
+    public TimeSpan? EndTime { get; init; }
+    
     [JsonPropertyName("warmup")]
     public TimeSpan? Warmup { get; init; }
     
