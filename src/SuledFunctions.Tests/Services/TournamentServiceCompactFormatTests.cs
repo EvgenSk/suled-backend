@@ -7,6 +7,7 @@ using SuledFunctions.Models;
 using SuledFunctions.Models.Optimized;
 using SuledFunctions.Repositories;
 using SuledFunctions.Services;
+using SuledFunctions.Services.Excel.Interfaces;
 using System.Text.Json;
 
 namespace SuledFunctions.Tests.Services;
@@ -19,6 +20,7 @@ public class TournamentServiceCompactFormatTests
 {
     private readonly Mock<ILogger<TournamentService>> _loggerMock;
     private readonly Mock<ITournamentRepository> _repositoryMock;
+    private readonly Mock<IExcelMetadataExtractor> _metadataExtractorMock;
     private readonly IOptions<TournamentSettings> _settings;
     private readonly TournamentService _service;
 
@@ -26,12 +28,13 @@ public class TournamentServiceCompactFormatTests
     {
         _loggerMock = new Mock<ILogger<TournamentService>>();
         _repositoryMock = new Mock<ITournamentRepository>();
+        _metadataExtractorMock = new Mock<IExcelMetadataExtractor>();
         _settings = Options.Create(new TournamentSettings
         {
             MaxResultsDefault = 100
         });
 
-        _service = new TournamentService(_repositoryMock.Object, _settings, _loggerMock.Object);
+        _service = new TournamentService(_repositoryMock.Object, _metadataExtractorMock.Object, _settings, _loggerMock.Object);
     }
 
     [Fact]
