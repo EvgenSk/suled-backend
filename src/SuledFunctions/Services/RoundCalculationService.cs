@@ -12,7 +12,7 @@ public class RoundCalculationService : IRoundCalculationService
     private readonly ILogger<RoundCalculationService> _logger;
     
     // Default assumptions if not specified
-    private const int DefaultGameDurationMinutes = 15;
+    private const int DefaultWarmupMinutes = 5;
     private const int DefaultBreakBetweenRoundsMinutes = 5;
     private static readonly TimeSpan DefaultStartTime = new TimeSpan(9, 0, 0); // 9:00 AM
     private static readonly TimeSpan DefaultEndTime = new TimeSpan(18, 0, 0); // 6:00 PM
@@ -47,32 +47,30 @@ public class RoundCalculationService : IRoundCalculationService
         var tournamentStartDate = tournament.StartDate ?? DateTime.UtcNow.Date;
         var tournamentStartTime = tournament.StartTime ?? DefaultStartTime;
         var tournamentEndTime = tournament.EndTime ?? DefaultEndTime;
-        
-        // Apply warmup time - games start after warmup period
-        var warmupDuration = tournament.Warmup ?? TimeSpan.Zero;
-        var currentTime = tournamentStartDate.Add(tournamentStartTime).Add(warmupDuration);
+
+        var totalDayMinutes = (tournamentEndTime - tournamentStartTime).TotalMinutes;
+        var warmupMinutes = (tournament.Warmup ?? TimeSpan.FromMinutes(DefaultWarmupMinutes)).TotalMinutes;
+        var breakMinutes = DefaultBreakBetweenRoundsMinutes;
+        var roundCount = roundNumbers.Count;
+
+        // Available time = total day - warmup - breaks between rounds
+        var totalBreakMinutes = (roundCount - 1) * breakMinutes;
+        var availableForRoundsMinutes = totalDayMinutes - warmupMinutes - totalBreakMinutes;
+        var roundDurationMinutes = availableForRoundsMinutes / roundCount;
+
+        _logger.LogInformation(
+            "Round duration calculated: {RoundDuration:F1} min ({RoundCount} rounds, {TotalDay} min day, {Warmup} min warmup, {Breaks} min total breaks)",
+            roundDurationMinutes, roundCount, totalDayMinutes, warmupMinutes, totalBreakMinutes);
+
+        var currentTime = tournamentStartDate.Add(tournamentStartTime).AddMinutes(warmupMinutes);
         var rounds = new List<TournamentRound>();
 
         foreach (var roundNumber in roundNumbers)
         {
-            // Get games for this round
-            var roundGames = allGames.Where(g => g.Round == roundNumber).ToList();
-            var gameCount = roundGames.Count;
-
             // Count unique games (each game appears twice in pair-centered structure)
-            var uniqueGameCount = gameCount / 2;
+            var roundGames = allGames.Where(g => g.Round == roundNumber).ToList();
+            var uniqueGameCount = roundGames.Count / 2;
 
-            // Determine max courts used in this round
-            var maxCourt = roundGames.Max(g => g.CourtNumber);
-            
-            // Calculate round duration based on games per court
-            // If we have 4 games and 2 courts, games run in parallel (2 games per court sequentially)
-            var gamesPerCourt = uniqueGameCount > 0 && maxCourt > 0 
-                ? (int)Math.Ceiling((double)uniqueGameCount / maxCourt) 
-                : 1;
-            
-            var roundDurationMinutes = gamesPerCourt * DefaultGameDurationMinutes;
-            
             var roundStart = currentTime;
             var roundEnd = roundStart.AddMinutes(roundDurationMinutes);
 
@@ -85,18 +83,7 @@ public class RoundCalculationService : IRoundCalculationService
             });
 
             // Move to next round start time (with break)
-            currentTime = roundEnd.AddMinutes(DefaultBreakBetweenRoundsMinutes);
-            
-            // Check if we've exceeded the daily end time
-            if (currentTime.TimeOfDay > tournamentEndTime)
-            {
-                // Move to next day
-                var nextDay = tournament.EndDate ?? tournamentStartDate.AddDays(1);
-                if (currentTime.Date < nextDay)
-                {
-                    currentTime = currentTime.Date.AddDays(1).Add(tournamentStartTime);
-                }
-            }
+            currentTime = roundEnd.AddMinutes(breakMinutes);
         }
 
         _logger.LogInformation("Calculated {Count} rounds for tournament {TournamentId}", 
