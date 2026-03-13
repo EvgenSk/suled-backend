@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using System.Net;
 using SuledFunctions.Models;
 using SuledFunctions.Models.DTOs;
+using SuledFunctions.Models.Optimized;
 
 namespace SuledFunctions.Functions;
 
@@ -29,9 +30,12 @@ public class GetGamesForPairFunction
             containerName: "%CosmosContainerName%",
             Connection = "CosmosDbConnection",
             SqlQuery = "SELECT * FROM c WHERE c.Pairs != null")]
-        IEnumerable<Tournament> tournaments)
+        IEnumerable<TournamentCompact> compactTournaments)
     {
         _logger.LogInformation("Getting games for pair: {PairId}", pairId);
+
+        // Expand compact storage model to full Tournament model before processing
+        var tournaments = compactTournaments.Select(TournamentCompactMapper.FromCompact);
 
         try
         {

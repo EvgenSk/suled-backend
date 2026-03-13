@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using SuledFunctions.TelegramBot.Configuration;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
@@ -18,15 +20,15 @@ public class TelegramBotService : ITelegramBotService
     private readonly IPairService _pairService;
 
     public TelegramBotService(
+        IOptions<TelegramBotSettings> settings,
         ILogger<TelegramBotService> logger,
         ISubscriptionService subscriptionService,
-        IPairService pairService,
-        string botToken)
+        IPairService pairService)
     {
         _logger = logger;
         _subscriptionService = subscriptionService;
         _pairService = pairService;
-        _botClient = new TelegramBotClient(botToken);
+        _botClient = new TelegramBotClient(settings.Value.BotToken);
     }
 
     public async Task HandleUpdateAsync(Update update)

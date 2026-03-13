@@ -101,7 +101,7 @@ jobs:
 
   deploy-prod:
     runs-on: ubuntu-latest
-    needs: build-and-test
+    needs: [build-and-test, infrastructure]  # infrastructure must finish before code lands
     if: github.ref == 'refs/heads/main'
     environment:
       name: 'Production'

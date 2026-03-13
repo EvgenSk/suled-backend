@@ -34,8 +34,9 @@ public class TournamentQuerySpec
         if (!string.IsNullOrWhiteSpace(Division))
             clauses.Add("CONTAINS(c.division, @division, true)");
 
-        if (Status.HasValue)
-            clauses.Add("c.status = @status");
+        // Status is intentionally excluded from DB-level filtering.
+        // Stored status may be stale; status is recomputed and filtered in-memory
+        // by the service layer after expanding the compact model.
 
         return clauses;
     }

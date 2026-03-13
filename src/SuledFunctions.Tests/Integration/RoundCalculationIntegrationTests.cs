@@ -87,11 +87,13 @@ public class RoundCalculationIntegrationTests : IDisposable
     [Fact]
     public async Task TournamentWorkflow_WithMultipleRounds_CalculatesCorrectTimings()
     {
-        // Arrange - Create Excel with 3 rounds, 2 courts
+        // 9:00–10:30 = 90 min, default warmup 5 min, 3 rounds, 2 breaks (10 min)
+        // roundDuration = (90 - 5 - 10) / 3 = 25 min
         using var excelStream = CreateMultiRoundExcel(
             rounds: 3,
             gamesPerRound: 4,
-            courts: 2);
+            courts: 2,
+            endTime: "10:30");
         
         var service = CreateParserService();
 
@@ -101,42 +103,37 @@ public class RoundCalculationIntegrationTests : IDisposable
         // Assert
         tournament.Rounds.Should().HaveCount(3);
         
-        // Round 1: 4 games / 2 courts = 2 per court = 30 minutes
-        tournament.Rounds[0].RoundNumber.Should().Be(1);
-        tournament.Rounds[0].GameCount.Should().Be(4);
+        // All rounds should have equal duration
         var round1Duration = tournament.Rounds[0].EndTime.ToTimeSpan() - tournament.Rounds[0].StartTime.ToTimeSpan();
-        round1Duration.Should().Be(TimeSpan.FromMinutes(30));
+        var round2Duration = tournament.Rounds[1].EndTime.ToTimeSpan() - tournament.Rounds[1].StartTime.ToTimeSpan();
+        var round3Duration = tournament.Rounds[2].EndTime.ToTimeSpan() - tournament.Rounds[2].StartTime.ToTimeSpan();
+        round1Duration.Should().Be(TimeSpan.FromMinutes(25));
+        round2Duration.Should().Be(round1Duration);
+        round3Duration.Should().Be(round1Duration);
         
-        // Round 2 should start 5 minutes after Round 1 ends
+        // 5-minute breaks between rounds
         var breakDuration = tournament.Rounds[1].StartTime.ToTimeSpan() - tournament.Rounds[0].EndTime.ToTimeSpan();
         breakDuration.Should().Be(TimeSpan.FromMinutes(5));
         
-        // Round 3 should also have proper break
         var break2Duration = tournament.Rounds[2].StartTime.ToTimeSpan() - tournament.Rounds[1].EndTime.ToTimeSpan();
         break2Duration.Should().Be(TimeSpan.FromMinutes(5));
     }
 
     [Fact]
-    public async Task TournamentWorkflow_WithDifferentCourtCounts_AdjustsDuration()
+    public async Task TournamentWorkflow_LastRoundEndsAtDeclaredEndTime()
     {
-        // Arrange - Test with 1 court vs 4 courts for same games
-        using var stream1Court = CreateMultiRoundExcel(rounds: 1, gamesPerRound: 4, courts: 1);
-        using var stream4Courts = CreateMultiRoundExcel(rounds: 1, gamesPerRound: 4, courts: 4);
-        
+        // Verify that the scheduled rounds exactly fill the declared day window
+        // 9:00–10:30 = 90 min, default warmup 5 min, 3 rounds, 2 breaks (10 min)
+        // last round should end at exactly 10:30
+        using var stream = CreateMultiRoundExcel(rounds: 3, gamesPerRound: 4, courts: 2, endTime: "10:30");
         var service = CreateParserService();
 
-        // Act
-        var tournament1Court = await service.ParseTournamentAsync(stream1Court, "1court.xlsx");
-        var tournament4Courts = await service.ParseTournamentAsync(stream4Courts, "4courts.xlsx");
+        var tournament = await service.ParseTournamentAsync(stream, "window-test.xlsx");
 
-        // Assert
-        // With 1 court: 4 games sequential = 60 minutes
-        var duration1Court = tournament1Court.Rounds[0].EndTime.ToTimeSpan() - tournament1Court.Rounds[0].StartTime.ToTimeSpan();
-        duration1Court.Should().Be(TimeSpan.FromMinutes(60));
-        
-        // With 4 courts: 4 games parallel = 15 minutes
-        var duration4Courts = tournament4Courts.Rounds[0].EndTime.ToTimeSpan() - tournament4Courts.Rounds[0].StartTime.ToTimeSpan();
-        duration4Courts.Should().Be(TimeSpan.FromMinutes(15));
+        tournament.Rounds.Should().HaveCount(3);
+        var lastRoundEnd = tournament.Rounds.Last().EndTime.ToTimeSpan();
+        var declaredEnd = new TimeSpan(10, 30, 0);
+        Math.Abs((lastRoundEnd - declaredEnd).TotalSeconds).Should().BeLessThan(1);
     }
 
     [Fact]
@@ -151,8 +148,9 @@ public class RoundCalculationIntegrationTests : IDisposable
 
         // Assert
         tournament.Rounds.Should().NotBeEmpty();
+        // Default start 9:00 + default warmup 5 min → first round starts at 9:05
         tournament.Rounds[0].StartTime.Hour.Should().Be(9);
-        tournament.Rounds[0].StartTime.Minute.Should().Be(0); // Default start time
+        tournament.Rounds[0].StartTime.Minute.Should().Be(5);
     }
 
     private ExcelParserService CreateParserService()
@@ -227,7 +225,7 @@ public class RoundCalculationIntegrationTests : IDisposable
         return stream;
     }
 
-    private MemoryStream CreateMultiRoundExcel(int rounds, int gamesPerRound, int courts)
+    private MemoryStream CreateMultiRoundExcel(int rounds, int gamesPerRound, int courts, string? endTime = null)
     {
         var package = new ExcelPackage();
         var worksheet = package.Workbook.Worksheets.Add("Tournament");
@@ -237,6 +235,11 @@ public class RoundCalculationIntegrationTests : IDisposable
         worksheet.Cells[1, 11].Value = "22.11.2025";
         worksheet.Cells[2, 10].Value = "Start Time:";
         worksheet.Cells[2, 11].Value = "09:00";
+        if (endTime != null)
+        {
+            worksheet.Cells[3, 10].Value = "End Time:";
+            worksheet.Cells[3, 11].Value = endTime;
+        }
 
         // Add headers
         worksheet.Cells[1, 1].Value = "Round";

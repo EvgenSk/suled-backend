@@ -32,6 +32,7 @@ public static class TournamentCompactMapper
         return new TournamentCompact
         {
             Id = tournament.Id,
+            Pk = tournament.StartDate?.Year.ToString() ?? "0",
             Name = tournament.Name,
             CreatedDate = tournament.CreatedDate,
             BlobFileName = tournament.BlobFileName,

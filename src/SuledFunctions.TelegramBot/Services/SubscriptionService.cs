@@ -1,5 +1,7 @@
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using SuledFunctions.TelegramBot.Configuration;
 using SuledFunctions.TelegramBot.Models;
 
 namespace SuledFunctions.TelegramBot.Services;
@@ -15,14 +17,13 @@ public class SubscriptionService : ISubscriptionService
 
     public SubscriptionService(
         CosmosClient cosmosClient,
-        ILogger<SubscriptionService> logger,
-        string databaseName,
-        string subscriptionsContainerName,
-        string notificationsContainerName)
+        IOptions<TelegramBotCosmosDbSettings> settings,
+        ILogger<SubscriptionService> logger)
     {
         _logger = logger;
-        _subscriptionsContainer = cosmosClient.GetContainer(databaseName, subscriptionsContainerName);
-        _notificationsContainer = cosmosClient.GetContainer(databaseName, notificationsContainerName);
+        var s = settings.Value;
+        _subscriptionsContainer = cosmosClient.GetContainer(s.DatabaseName, s.SubscriptionsContainerName);
+        _notificationsContainer = cosmosClient.GetContainer(s.DatabaseName, s.NotificationsContainerName);
     }
 
     public async Task<UserSubscription?> GetSubscriptionAsync(long chatId)

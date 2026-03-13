@@ -143,6 +143,14 @@ resource botFunctionApp 'Microsoft.Web/sites@2023-12-01' = {
           value: 'Tournaments'
         }
         {
+          name: 'CosmosSubscriptionsContainerName'
+          value: subscriptionsContainer.name
+        }
+        {
+          name: 'CosmosNotificationsContainerName'
+          value: notificationsContainer.name
+        }
+        {
           name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
           value: applicationInsights.properties.ConnectionString
         }

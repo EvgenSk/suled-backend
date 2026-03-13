@@ -35,10 +35,12 @@ public class TournamentRepository : ITournamentRepository
         {
             var whereClauses = querySpec.BuildWhereClauses();
             
-            // Build the complete query text
+            // Build the complete query text. ORDER BY is pushed to Cosmos so the
+            // MaxResults cutoff is applied to the already-sorted result set.
+            var orderBy = "ORDER BY c.startDate DESC";
             var queryText = whereClauses.Any() 
-                ? $"SELECT * FROM c WHERE {string.Join(" AND ", whereClauses)}"
-                : "SELECT * FROM c";
+                ? $"SELECT * FROM c WHERE {string.Join(" AND ", whereClauses)} {orderBy}"
+                : $"SELECT * FROM c {orderBy}";
             
             // Create query definition and add all parameters
             var queryDefinition = new QueryDefinition(queryText);
@@ -51,8 +53,6 @@ public class TournamentRepository : ITournamentRepository
                 queryDefinition = queryDefinition.WithParameter("@location", querySpec.Location);
             if (!string.IsNullOrWhiteSpace(querySpec.Division))
                 queryDefinition = queryDefinition.WithParameter("@division", querySpec.Division);
-            if (querySpec.Status.HasValue)
-                queryDefinition = queryDefinition.WithParameter("@status", (int)querySpec.Status.Value);
 
             _logger.LogInformation("Executing query: {Query}", queryText);
 
@@ -83,16 +83,26 @@ public class TournamentRepository : ITournamentRepository
     {
         try
         {
-            var response = await _container.ReadItemAsync<TournamentCompact>(
-                id, 
-                new PartitionKey(id), 
-                cancellationToken: cancellationToken);
-            
-            _logger.LogInformation("Retrieved tournament {TournamentId}", id);
-            return response.Resource;
-        }
-        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
-        {
+            // Cross-partition query by id because the pk (year) is not known at call time.
+            // The id field is indexed, so this remains a fast, single-document lookup.
+            var query = new QueryDefinition("SELECT TOP 1 * FROM c WHERE c.id = @id")
+                .WithParameter("@id", id);
+
+            using var iterator = _container.GetItemQueryIterator<TournamentCompact>(
+                query,
+                requestOptions: new QueryRequestOptions { MaxItemCount = 1 });
+
+            if (iterator.HasMoreResults)
+            {
+                var page = await iterator.ReadNextAsync(cancellationToken);
+                var item = page.FirstOrDefault();
+                if (item != null)
+                {
+                    _logger.LogInformation("Retrieved tournament {TournamentId}", id);
+                    return item;
+                }
+            }
+
             _logger.LogWarning("Tournament {TournamentId} not found", id);
             return null;
         }
@@ -111,7 +121,7 @@ public class TournamentRepository : ITournamentRepository
         {
             var response = await _container.CreateItemAsync(
                 tournament,
-                new PartitionKey(tournament.Id),
+                new PartitionKey(tournament.Pk),
                 cancellationToken: cancellationToken);
 
             _logger.LogInformation("Created tournament {TournamentId}", tournament.Id);
@@ -133,7 +143,7 @@ public class TournamentRepository : ITournamentRepository
             var response = await _container.ReplaceItemAsync(
                 tournament,
                 tournament.Id,
-                new PartitionKey(tournament.Id),
+                new PartitionKey(tournament.Pk),
                 cancellationToken: cancellationToken);
 
             _logger.LogInformation("Updated tournament {TournamentId}", tournament.Id);
@@ -157,18 +167,21 @@ public class TournamentRepository : ITournamentRepository
     {
         try
         {
+            // Look up the item first to retrieve its pk (year partition key).
+            var item = await GetByIdAsync(id, cancellationToken);
+            if (item == null)
+            {
+                _logger.LogWarning("Tournament {TournamentId} not found for deletion", id);
+                return false;
+            }
+
             await _container.DeleteItemAsync<TournamentCompact>(
                 id,
-                new PartitionKey(id),
+                new PartitionKey(item.Pk),
                 cancellationToken: cancellationToken);
 
             _logger.LogInformation("Deleted tournament {TournamentId}", id);
             return true;
-        }
-        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
-        {
-            _logger.LogWarning("Tournament {TournamentId} not found for deletion", id);
-            return false;
         }
         catch (Exception ex)
         {

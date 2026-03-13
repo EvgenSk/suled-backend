@@ -98,6 +98,12 @@ public class UploadTournamentFunction
         var fileName = ExtractFileName(req);
         _logger.LogInformation("Processing file: {FileName}", fileName);
 
+        // Validate file extension (.xlsx / .xls only)
+        if (!FileUploadValidator.ValidateFileExtension(fileName))
+        {
+            throw new Exceptions.ValidationException("fileName", Constants.ErrorMessages.InvalidFileType);
+        }
+
         _logger.LogInformation("Parsing tournament from file");
         
         try

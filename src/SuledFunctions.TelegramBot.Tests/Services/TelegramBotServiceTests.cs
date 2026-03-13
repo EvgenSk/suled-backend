@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Options;
+using SuledFunctions.TelegramBot.Configuration;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using SuledFunctions.TelegramBot.Services;
@@ -20,15 +22,18 @@ public class TelegramBotServiceTests
         _pairServiceMock = new Mock<IPairService>();
     }
 
+    private TelegramBotService CreateService() =>
+        new TelegramBotService(
+            Options.Create(new TelegramBotSettings { BotToken = TestBotToken }),
+            _loggerMock.Object,
+            _subscriptionServiceMock.Object,
+            _pairServiceMock.Object);
+
     [Fact]
     public void TelegramBotService_ShouldInitializeWithValidToken()
     {
         // Act
-        var service = new TelegramBotService(
-            _loggerMock.Object,
-            _subscriptionServiceMock.Object,
-            _pairServiceMock.Object,
-            TestBotToken);
+        var service = CreateService();
 
         // Assert
         service.Should().NotBeNull();
@@ -38,11 +43,7 @@ public class TelegramBotServiceTests
     public async Task HandleUpdateAsync_WithNullUpdate_ShouldHandleGracefully()
     {
         // Arrange
-        var service = new TelegramBotService(
-            _loggerMock.Object,
-            _subscriptionServiceMock.Object,
-            _pairServiceMock.Object,
-            TestBotToken);
+        var service = CreateService();
 
         var update = new Update();
 
@@ -64,11 +65,7 @@ public class TelegramBotServiceTests
     public async Task SendNewTournamentNotificationAsync_WithEmptyChatIds_ShouldNotFail()
     {
         // Arrange
-        var service = new TelegramBotService(
-            _loggerMock.Object,
-            _subscriptionServiceMock.Object,
-            _pairServiceMock.Object,
-            TestBotToken);
+        var service = CreateService();
 
         // Act
         await service.SendNewTournamentNotificationAsync("Test Tournament", new List<long>());
@@ -94,11 +91,7 @@ public class TelegramBotServiceTests
         string opponent)
     {
         // Arrange
-        var service = new TelegramBotService(
-            _loggerMock.Object,
-            _subscriptionServiceMock.Object,
-            _pairServiceMock.Object,
-            TestBotToken);
+        var service = CreateService();
 
         var chatId = 123456789L;
         var pairName = "Test Pair";

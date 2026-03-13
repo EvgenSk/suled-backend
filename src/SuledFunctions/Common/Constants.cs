@@ -37,6 +37,7 @@ public static class Constants
         public const string ProcessingError = "Failed to process tournament file";
         public const string TournamentNotFound = "Tournament not found";
         public const string InvalidTournamentId = "Invalid tournament ID";
+        public const string InvalidFileType = "Only .xlsx and .xls files are supported";
     }
 
     /// <summary>

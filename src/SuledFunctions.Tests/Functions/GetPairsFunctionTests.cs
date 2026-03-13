@@ -18,13 +18,24 @@ namespace SuledFunctions.Tests.Functions;
 public class GetPairsFunctionTests
 {
     private readonly Mock<ILogger<GetPairsFunction>> _loggerMock;
+    private readonly Mock<ITournamentService> _tournamentServiceMock;
     private readonly GetPairsFunction _function;
 
     public GetPairsFunctionTests()
     {
         _loggerMock = new Mock<ILogger<GetPairsFunction>>();
-        var pairService = new PairService(); // Use real service instead of mock
-        _function = new GetPairsFunction(pairService, _loggerMock.Object);
+        _tournamentServiceMock = new Mock<ITournamentService>();
+        var pairService = new PairService();
+        _function = new GetPairsFunction(_tournamentServiceMock.Object, pairService, _loggerMock.Object);
+    }
+
+    private void SetupTournaments(IEnumerable<Tournament> tournaments)
+    {
+        _tournamentServiceMock
+            .Setup(s => s.GetTournamentsAsync(
+                It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<string?>(),
+                It.IsAny<string?>(), It.IsAny<TournamentStatus?>(), It.IsAny<int>()))
+            .ReturnsAsync(tournaments.ToList());
     }
 
     [Fact]
@@ -32,10 +43,11 @@ public class GetPairsFunctionTests
     {
         // Arrange
         var tournaments = CreateTestTournaments();
+        SetupTournaments(tournaments);
         var requestMock = CreateMockRequest();
 
         // Act
-        var response = await _function.Run(requestMock.Object, tournaments);
+        var response = await _function.Run(requestMock.Object);
 
         // Assert
         response.Should().NotBeNull();
@@ -51,11 +63,11 @@ public class GetPairsFunctionTests
     public async Task Run_WithEmptyTournaments_ReturnsEmptyPairsList()
     {
         // Arrange
-        var tournaments = Enumerable.Empty<Tournament>();
+        SetupTournaments(Enumerable.Empty<Tournament>());
         var requestMock = CreateMockRequest();
 
         // Act
-        var response = await _function.Run(requestMock.Object, tournaments);
+        var response = await _function.Run(requestMock.Object);
 
         // Assert
         response.Should().NotBeNull();
@@ -105,10 +117,11 @@ public class GetPairsFunctionTests
             }
         };
 
+        SetupTournaments(new[] { tournament });
         var requestMock = CreateMockRequest();
 
         // Act
-        var response = await _function.Run(requestMock.Object, new[] { tournament });
+        var response = await _function.Run(requestMock.Object);
 
         // Assert
         var content = await GetResponseContent(response);
@@ -121,10 +134,11 @@ public class GetPairsFunctionTests
         // Arrange
         var tournament1 = CreateTournament("t1", 1);
         var tournament2 = CreateTournament("t2", 2);
+        SetupTournaments(new[] { tournament1, tournament2 });
         var requestMock = CreateMockRequest();
 
         // Act
-        var response = await _function.Run(requestMock.Object, new[] { tournament1, tournament2 });
+        var response = await _function.Run(requestMock.Object);
 
         // Assert
         var content = await GetResponseContent(response);
@@ -138,10 +152,11 @@ public class GetPairsFunctionTests
     {
         // Arrange
         var tournaments = CreateTestTournaments();
+        SetupTournaments(tournaments);
         var requestMock = CreateMockRequest();
 
         // Act
-        var response = await _function.Run(requestMock.Object, tournaments);
+        var response = await _function.Run(requestMock.Object);
 
         // Assert
         var content = await GetResponseContent(response);
@@ -162,10 +177,11 @@ public class GetPairsFunctionTests
     {
         // Arrange
         var tournaments = CreateTestTournaments();
+        SetupTournaments(tournaments);
         var requestMock = CreateMockRequest();
 
         // Act
-        var response = await _function.Run(requestMock.Object, tournaments);
+        var response = await _function.Run(requestMock.Object);
 
         // Assert
         var content = await GetResponseContent(response);
@@ -182,10 +198,11 @@ public class GetPairsFunctionTests
     {
         // Arrange
         var tournaments = CreateTestTournaments();
+        SetupTournaments(tournaments);
         var requestMock = CreateMockRequest();
 
         // Act
-        await _function.Run(requestMock.Object, tournaments);
+        await _function.Run(requestMock.Object);
 
         // Assert
         _loggerMock.Verify(
@@ -207,10 +224,11 @@ public class GetPairsFunctionTests
             Id = "test-1",
             Name = "Test Tournament"
         };
+        SetupTournaments(new[] { tournament });
         var requestMock = CreateMockRequest();
 
         // Act
-        var response = await _function.Run(requestMock.Object, new[] { tournament });
+        var response = await _function.Run(requestMock.Object);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);

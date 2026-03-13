@@ -2,7 +2,7 @@ using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+using SuledFunctions.TelegramBot.Configuration;
 using SuledFunctions.TelegramBot.Services;
 
 var host = new HostBuilder()
@@ -12,41 +12,30 @@ var host = new HostBuilder()
         services.AddApplicationInsightsTelemetryWorkerService();
         services.ConfigureFunctionsApplicationInsights();
 
-        // Get configuration
-        var botToken = Environment.GetEnvironmentVariable("TelegramBotToken")
-            ?? throw new InvalidOperationException("TelegramBotToken not configured");
-        var cosmosConnectionString = Environment.GetEnvironmentVariable("CosmosDbConnection")
-            ?? throw new InvalidOperationException("CosmosDbConnection not configured");
-        var databaseName = Environment.GetEnvironmentVariable("CosmosDbName") ?? "TournamentDb";
-        var tournamentsContainer = Environment.GetEnvironmentVariable("CosmosContainerName") ?? "Tournaments";
-        var subscriptionsContainer = "Subscriptions";
-        var notificationsContainer = "Notifications";
+        // Bind settings from configuration (environment variables / appsettings)
+        services.Configure<TelegramBotSettings>(config =>
+        {
+            config.BotToken = context.Configuration["TelegramBotToken"]
+                ?? throw new InvalidOperationException("TelegramBotToken not configured");
+        });
+
+        services.Configure<TelegramBotCosmosDbSettings>(config =>
+        {
+            config.DatabaseName = context.Configuration["CosmosDbName"] ?? "TournamentDb";
+            config.TournamentsContainerName = context.Configuration["CosmosContainerName"] ?? "Tournaments";
+            config.SubscriptionsContainerName = context.Configuration["CosmosSubscriptionsContainerName"] ?? "Subscriptions";
+            config.NotificationsContainerName = context.Configuration["CosmosNotificationsContainerName"] ?? "Notifications";
+        });
 
         // Register Cosmos Client
+        var cosmosConnectionString = context.Configuration["CosmosDbConnection"]
+            ?? throw new InvalidOperationException("CosmosDbConnection not configured");
         services.AddSingleton(_ => new CosmosClient(cosmosConnectionString));
 
         // Register services
-        services.AddSingleton<IPairService>(sp =>
-            new PairService(
-                sp.GetRequiredService<CosmosClient>(),
-                sp.GetRequiredService<ILogger<PairService>>(),
-                databaseName,
-                tournamentsContainer));
-
-        services.AddSingleton<ISubscriptionService>(sp =>
-            new SubscriptionService(
-                sp.GetRequiredService<CosmosClient>(),
-                sp.GetRequiredService<ILogger<SubscriptionService>>(),
-                databaseName,
-                subscriptionsContainer,
-                notificationsContainer));
-
-        services.AddSingleton<ITelegramBotService>(sp =>
-            new TelegramBotService(
-                sp.GetRequiredService<ILogger<TelegramBotService>>(),
-                sp.GetRequiredService<ISubscriptionService>(),
-                sp.GetRequiredService<IPairService>(),
-                botToken));
+        services.AddSingleton<IPairService, PairService>();
+        services.AddSingleton<ISubscriptionService, SubscriptionService>();
+        services.AddSingleton<ITelegramBotService, TelegramBotService>();
     })
     .Build();
 

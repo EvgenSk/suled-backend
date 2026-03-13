@@ -43,18 +43,33 @@ public class TournamentRepositoryTests
         _repository = new TournamentRepository(_mockCosmosClient.Object, _settings, _mockLogger.Object);
     }
 
+    // Helper: create a mock FeedIterator that yields the given items once then has no more results.
+    private static Mock<FeedIterator<TournamentCompact>> CreateMockIterator(
+        IEnumerable<TournamentCompact> items)
+    {
+        var list = items.ToList();
+        var mockResponse = new Mock<FeedResponse<TournamentCompact>>();
+        mockResponse.Setup(r => r.GetEnumerator()).Returns(() => list.GetEnumerator());
+
+        var mockIterator = new Mock<FeedIterator<TournamentCompact>>();
+        mockIterator.SetupSequence(i => i.HasMoreResults).Returns(list.Count > 0).Returns(false);
+        mockIterator.Setup(i => i.ReadNextAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockResponse.Object);
+        return mockIterator;
+    }
+
     [Fact]
     public async Task GetByIdAsync_ReturnsNull_WhenTournamentNotFound()
     {
         // Arrange
         var tournamentId = "nonexistent-id";
+        var mockIterator = CreateMockIterator(Enumerable.Empty<TournamentCompact>());
         _mockContainer
-            .Setup(c => c.ReadItemAsync<TournamentCompact>(
+            .Setup(c => c.GetItemQueryIterator<TournamentCompact>(
+                It.IsAny<QueryDefinition>(),
                 It.IsAny<string>(),
-                It.IsAny<PartitionKey>(),
-                It.IsAny<ItemRequestOptions>(),
-                It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new CosmosException("Not found", HttpStatusCode.NotFound, 0, "", 0));
+                It.IsAny<QueryRequestOptions>()))
+            .Returns(mockIterator.Object);
 
         // Act
         var result = await _repository.GetByIdAsync(tournamentId);
@@ -68,22 +83,14 @@ public class TournamentRepositoryTests
     {
         // Arrange
         var tournamentId = "test-id";
-        var expectedTournament = new TournamentCompact
-        {
-            Id = tournamentId,
-            Name = "Test Tournament"
-        };
-
-        var mockResponse = new Mock<ItemResponse<TournamentCompact>>();
-        mockResponse.Setup(r => r.Resource).Returns(expectedTournament);
-
+        var expectedTournament = new TournamentCompact { Id = tournamentId, Name = "Test Tournament" };
+        var mockIterator = CreateMockIterator(new[] { expectedTournament });
         _mockContainer
-            .Setup(c => c.ReadItemAsync<TournamentCompact>(
-                tournamentId,
-                new PartitionKey(tournamentId),
-                It.IsAny<ItemRequestOptions>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(mockResponse.Object);
+            .Setup(c => c.GetItemQueryIterator<TournamentCompact>(
+                It.IsAny<QueryDefinition>(),
+                It.IsAny<string>(),
+                It.IsAny<QueryRequestOptions>()))
+            .Returns(mockIterator.Object);
 
         // Act
         var result = await _repository.GetByIdAsync(tournamentId);
@@ -101,6 +108,7 @@ public class TournamentRepositoryTests
         var tournament = new TournamentCompact
         {
             Id = "new-id",
+            Pk = "2025",
             Name = "New Tournament"
         };
 
@@ -110,7 +118,7 @@ public class TournamentRepositoryTests
         _mockContainer
             .Setup(c => c.CreateItemAsync(
                 tournament,
-                new PartitionKey(tournament.Id),
+                It.IsAny<PartitionKey>(),
                 It.IsAny<ItemRequestOptions>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(mockResponse.Object);
@@ -155,15 +163,15 @@ public class TournamentRepositoryTests
     [Fact]
     public async Task DeleteAsync_ReturnsFalse_WhenTournamentNotFound()
     {
-        // Arrange
+        // Arrange: GetByIdAsync queries and finds nothing → DeleteAsync returns false
         var tournamentId = "nonexistent-id";
+        var mockIterator = CreateMockIterator(Enumerable.Empty<TournamentCompact>());
         _mockContainer
-            .Setup(c => c.DeleteItemAsync<TournamentCompact>(
+            .Setup(c => c.GetItemQueryIterator<TournamentCompact>(
+                It.IsAny<QueryDefinition>(),
                 It.IsAny<string>(),
-                It.IsAny<PartitionKey>(),
-                It.IsAny<ItemRequestOptions>(),
-                It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new CosmosException("Not found", HttpStatusCode.NotFound, 0, "", 0));
+                It.IsAny<QueryRequestOptions>()))
+            .Returns(mockIterator.Object);
 
         // Act
         var result = await _repository.DeleteAsync(tournamentId);
@@ -175,17 +183,25 @@ public class TournamentRepositoryTests
     [Fact]
     public async Task DeleteAsync_ReturnsTrue_WhenSuccessful()
     {
-        // Arrange
+        // Arrange: GetByIdAsync finds the item, then DeleteItemAsync succeeds
         var tournamentId = "test-id";
-        var mockResponse = new Mock<ItemResponse<TournamentCompact>>();
+        var existingItem = new TournamentCompact { Id = tournamentId, Pk = "2025" };
+        var mockIterator = CreateMockIterator(new[] { existingItem });
+        _mockContainer
+            .Setup(c => c.GetItemQueryIterator<TournamentCompact>(
+                It.IsAny<QueryDefinition>(),
+                It.IsAny<string>(),
+                It.IsAny<QueryRequestOptions>()))
+            .Returns(mockIterator.Object);
 
+        var mockDeleteResponse = new Mock<ItemResponse<TournamentCompact>>();
         _mockContainer
             .Setup(c => c.DeleteItemAsync<TournamentCompact>(
                 tournamentId,
-                new PartitionKey(tournamentId),
+                It.IsAny<PartitionKey>(),
                 It.IsAny<ItemRequestOptions>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(mockResponse.Object);
+            .ReturnsAsync(mockDeleteResponse.Object);
 
         // Act
         var result = await _repository.DeleteAsync(tournamentId);

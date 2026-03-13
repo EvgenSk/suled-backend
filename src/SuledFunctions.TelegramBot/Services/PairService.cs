@@ -1,7 +1,9 @@
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using SuledFunctions.Models;
 using SuledFunctions.Models.DTOs;
+using SuledFunctions.TelegramBot.Configuration;
 
 namespace SuledFunctions.TelegramBot.Services;
 
@@ -15,12 +17,12 @@ public class PairService : IPairService
 
     public PairService(
         CosmosClient cosmosClient,
-        ILogger<PairService> logger,
-        string databaseName,
-        string tournamentsContainerName)
+        IOptions<TelegramBotCosmosDbSettings> settings,
+        ILogger<PairService> logger)
     {
         _logger = logger;
-        _tournamentsContainer = cosmosClient.GetContainer(databaseName, tournamentsContainerName);
+        var s = settings.Value;
+        _tournamentsContainer = cosmosClient.GetContainer(s.DatabaseName, s.TournamentsContainerName);
     }
 
     public async Task<List<PairDto>> GetAllPairsAsync()

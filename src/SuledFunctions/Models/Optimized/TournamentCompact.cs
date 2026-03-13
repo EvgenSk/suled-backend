@@ -10,10 +10,18 @@ namespace SuledFunctions.Models.Optimized;
 public record TournamentCompact
 {
     /// <summary>
-    /// Tournament ID (GUID). Used as partition key in Cosmos DB.
+    /// Tournament ID (GUID).
     /// </summary>
     [JsonPropertyName("id")]
     public string Id { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Partition key: year of the tournament start date (e.g., "2025").
+    /// Co-locates all tournaments from the same year in one logical partition,
+    /// eliminating cross-partition fan-outs for year-filtered list queries.
+    /// </summary>
+    [JsonPropertyName("pk")]
+    public string Pk { get; set; } = string.Empty;
     
     /// <summary>
     /// Tournament name.

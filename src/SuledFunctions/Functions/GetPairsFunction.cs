@@ -2,7 +2,6 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using System.Net;
-using SuledFunctions.Models;
 using SuledFunctions.Services.Interfaces;
 
 namespace SuledFunctions.Functions;
@@ -12,11 +11,16 @@ namespace SuledFunctions.Functions;
 /// </summary>
 public class GetPairsFunction
 {
+    private readonly ITournamentService _tournamentService;
     private readonly IPairService _pairService;
     private readonly ILogger<GetPairsFunction> _logger;
 
-    public GetPairsFunction(IPairService pairService, ILogger<GetPairsFunction> logger)
+    public GetPairsFunction(
+        ITournamentService tournamentService,
+        IPairService pairService,
+        ILogger<GetPairsFunction> logger)
     {
+        _tournamentService = tournamentService;
         _pairService = pairService;
         _logger = logger;
     }
@@ -24,18 +28,14 @@ public class GetPairsFunction
     [Function("GetPairs")]
     public async Task<HttpResponseData> Run(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "pairs")] 
-        HttpRequestData req,
-        [CosmosDBInput(
-            databaseName: "%CosmosDbName%",
-            containerName: "%CosmosContainerName%",
-            Connection = "CosmosDbConnection",
-            SqlQuery = "SELECT * FROM c WHERE c.Pairs != null")]
-        IEnumerable<Tournament> tournaments)
+        HttpRequestData req)
     {
         _logger.LogInformation("Getting all pairs from all tournaments");
 
         try
         {
+            // Fetch all tournaments; int.MaxValue removes the default 100-item cap.
+            var tournaments = await _tournamentService.GetTournamentsAsync(maxResults: int.MaxValue);
             var allPairs = _pairService.GetUniquePairs(tournaments).ToList();
 
             var response = req.CreateResponse(HttpStatusCode.OK);

@@ -37,335 +37,321 @@ public class RoundCalculationServiceTests
     }
 
     [Fact]
-    public void CalculateRounds_WithSingleRound_CalculatesCorrectTiming()
+    public void CalculateRounds_WithSingleRound_FillsAvailableWindow()
     {
-        // Arrange
+        // 9:00–10:00 = 60 min, default warmup 5 min, 1 round, 0 breaks
+        // roundDuration = (60 - 5 - 0) / 1 = 55 min → Round 1: 9:05–10:00
         var tournament = CreateTournamentWithGames(
             startDate: new DateTime(2025, 11, 22),
             startTime: new TimeSpan(9, 0, 0),
+            endTime: new TimeSpan(10, 0, 0),
             rounds: new[] { 1 },
             gamesPerRound: new[] { 4 },
             courts: 2
         );
 
-        // Act
         var result = _service.CalculateRounds(tournament);
 
-        // Assert
         result.Should().HaveCount(1);
         result[0].RoundNumber.Should().Be(1);
         result[0].GameCount.Should().Be(4);
-        result[0].StartTime.Should().Be(new TimeOnly(9, 0, 0));
-        // 4 games / 2 courts = 2 games per court × 15 min = 30 minutes
-        result[0].EndTime.Should().Be(new TimeOnly(9, 30, 0));
+        result[0].StartTime.Should().Be(new TimeOnly(9, 5, 0));
+        result[0].EndTime.Should().Be(new TimeOnly(10, 0, 0));
     }
 
     [Fact]
-    public void CalculateRounds_WithMultipleRounds_CalculatesSequentialTiming()
+    public void CalculateRounds_WithMultipleRounds_DistributesTimeEvenly()
     {
-        // Arrange
+        // 9:00–10:30 = 90 min, default warmup 5 min, 3 rounds, 2 breaks (10 min)
+        // roundDuration = (90 - 5 - 10) / 3 = 25 min
+        // Round 1: 9:05–9:30, Round 2: 9:35–10:00, Round 3: 10:05–10:30
         var tournament = CreateTournamentWithGames(
             startDate: new DateTime(2025, 11, 22),
             startTime: new TimeSpan(9, 0, 0),
+            endTime: new TimeSpan(10, 30, 0),
             rounds: new[] { 1, 2, 3 },
             gamesPerRound: new[] { 4, 4, 2 },
             courts: 2
         );
 
-        // Act
         var result = _service.CalculateRounds(tournament);
 
-        // Assert
         result.Should().HaveCount(3);
-        
-        // Round 1: 9:00 - 9:30 (4 games / 2 courts = 30 min)
+
         result[0].RoundNumber.Should().Be(1);
-        result[0].StartTime.Should().Be(new TimeOnly(9, 0, 0));
+        result[0].StartTime.Should().Be(new TimeOnly(9, 5, 0));
         result[0].EndTime.Should().Be(new TimeOnly(9, 30, 0));
         result[0].GameCount.Should().Be(4);
-        
-        // Round 2: 9:35 - 10:05 (5 min break + 30 min)
+
         result[1].RoundNumber.Should().Be(2);
         result[1].StartTime.Should().Be(new TimeOnly(9, 35, 0));
-        result[1].EndTime.Should().Be(new TimeOnly(10, 5, 0));
+        result[1].EndTime.Should().Be(new TimeOnly(10, 0, 0));
         result[1].GameCount.Should().Be(4);
-        
-        // Round 3: 10:10 - 10:25 (5 min break + 15 min)
+
         result[2].RoundNumber.Should().Be(3);
-        result[2].StartTime.Should().Be(new TimeOnly(10, 10, 0));
-        result[2].EndTime.Should().Be(new TimeOnly(10, 25, 0));
+        result[2].StartTime.Should().Be(new TimeOnly(10, 5, 0));
+        result[2].EndTime.Should().Be(new TimeOnly(10, 30, 0));
         result[2].GameCount.Should().Be(2);
     }
 
     [Fact]
-    public void CalculateRounds_WithSingleCourt_CalculatesSequentialGames()
+    public void CalculateRounds_AllRoundsHaveEqualDuration()
     {
-        // Arrange
+        // Rounds with different game counts must still have equal duration
         var tournament = CreateTournamentWithGames(
             startDate: new DateTime(2025, 11, 22),
-            startTime: new TimeSpan(10, 0, 0),
-            rounds: new[] { 1 },
-            gamesPerRound: new[] { 3 },
-            courts: 1
+            startTime: new TimeSpan(9, 0, 0),
+            endTime: new TimeSpan(10, 30, 0),
+            rounds: new[] { 1, 2, 3 },
+            gamesPerRound: new[] { 6, 2, 4 },
+            courts: 2
         );
 
-        // Act
         var result = _service.CalculateRounds(tournament);
 
-        // Assert
-        result.Should().HaveCount(1);
-        result[0].GameCount.Should().Be(3);
-        // 3 games / 1 court = 3 games sequentially × 15 min = 45 minutes
-        result[0].StartTime.Should().Be(new TimeOnly(10, 0, 0));
-        result[0].EndTime.Should().Be(new TimeOnly(10, 45, 0));
+        result.Should().HaveCount(3);
+        var durations = result.Select(r => r.EndTime.ToTimeSpan() - r.StartTime.ToTimeSpan()).ToList();
+        durations[0].Should().Be(durations[1]);
+        durations[1].Should().Be(durations[2]);
     }
 
     [Fact]
-    public void CalculateRounds_WithManyCourts_CalculatesParallelGames()
+    public void CalculateRounds_BreakBetweenRoundsIsFiveMinutes()
     {
-        // Arrange
         var tournament = CreateTournamentWithGames(
             startDate: new DateTime(2025, 11, 22),
-            startTime: new TimeSpan(10, 0, 0),
-            rounds: new[] { 1 },
-            gamesPerRound: new[] { 6 },
-            courts: 6
+            startTime: new TimeSpan(9, 0, 0),
+            endTime: new TimeSpan(10, 30, 0),
+            rounds: new[] { 1, 2, 3 },
+            gamesPerRound: new[] { 2, 2, 2 },
+            courts: 1
         );
+        tournament.Warmup = TimeSpan.Zero;
 
-        // Act
         var result = _service.CalculateRounds(tournament);
 
-        // Assert
-        result.Should().HaveCount(1);
-        result[0].GameCount.Should().Be(6);
-        // 6 games / 6 courts = 1 game per court × 15 min = 15 minutes
-        result[0].StartTime.Should().Be(new TimeOnly(10, 0, 0));
-        result[0].EndTime.Should().Be(new TimeOnly(10, 15, 0));
+        result.Should().HaveCount(3);
+        for (int i = 0; i < result.Count - 1; i++)
+        {
+            var breakDuration = result[i + 1].StartTime.ToTimeSpan() - result[i].EndTime.ToTimeSpan();
+            breakDuration.Should().Be(TimeSpan.FromMinutes(5));
+        }
+    }
+
+    [Fact]
+    public void CalculateRounds_LastRoundEndsAtTournamentEndTime()
+    {
+        // Verify the distribution exactly fills the window
+        var tournament = CreateTournamentWithGames(
+            startDate: new DateTime(2025, 11, 22),
+            startTime: new TimeSpan(9, 0, 0),
+            endTime: new TimeSpan(10, 30, 0),
+            rounds: new[] { 1, 2, 3 },
+            gamesPerRound: new[] { 2, 2, 2 },
+            courts: 1
+        );
+        tournament.Warmup = TimeSpan.Zero;
+
+        var result = _service.CalculateRounds(tournament);
+
+        var expectedEnd = new TimeSpan(10, 30, 0);
+        var actualEnd = result.Last().EndTime.ToTimeSpan();
+        Math.Abs((actualEnd - expectedEnd).TotalSeconds).Should().BeLessThan(1);
     }
 
     [Fact]
     public void CalculateRounds_WithNoStartDate_UsesCurrentDate()
     {
-        // Arrange
         var tournament = CreateTournamentWithGames(
             startDate: null,
             startTime: null,
+            endTime: null,
             rounds: new[] { 1 },
             gamesPerRound: new[] { 2 },
             courts: 1
         );
 
-        // Act
         var result = _service.CalculateRounds(tournament);
 
-        // Assert
         result.Should().HaveCount(1);
+        // Default start 9:00 + default warmup 5 min → 9:05
         result[0].StartTime.Hour.Should().Be(9);
-        result[0].StartTime.Minute.Should().Be(0); // Default start time
+        result[0].StartTime.Minute.Should().Be(5);
     }
 
     [Fact]
     public void CalculateRounds_WithCustomStartTime_UsesProvidedTime()
     {
-        // Arrange
-        var customStartTime = new TimeSpan(14, 30, 0); // 2:30 PM
+        // 14:30–15:30 = 60 min, default warmup 5 min, 1 round
+        // roundDuration = 55 min → Round 1: 14:35–15:30
         var tournament = CreateTournamentWithGames(
             startDate: new DateTime(2025, 11, 25),
-            startTime: customStartTime,
+            startTime: new TimeSpan(14, 30, 0),
+            endTime: new TimeSpan(15, 30, 0),
             rounds: new[] { 1 },
             gamesPerRound: new[] { 2 },
             courts: 1
         );
 
-        // Act
         var result = _service.CalculateRounds(tournament);
 
-        // Assert
         result.Should().HaveCount(1);
-        result[0].StartTime.Should().Be(new TimeOnly(14, 30, 0));
+        result[0].StartTime.Should().Be(new TimeOnly(14, 35, 0));
+        result[0].EndTime.Should().Be(new TimeOnly(15, 30, 0));
     }
 
     [Fact]
-    public void CalculateRounds_WithNonSequentialRounds_HandlesCorrectly()
+    public void CalculateRounds_WithNonSequentialRounds_PreservesRoundNumbers()
     {
-        // Arrange
         var tournament = CreateTournamentWithGames(
             startDate: new DateTime(2025, 11, 22),
             startTime: new TimeSpan(9, 0, 0),
-            rounds: new[] { 1, 3, 5 }, // Non-sequential rounds
+            endTime: new TimeSpan(10, 30, 0),
+            rounds: new[] { 1, 3, 5 },
             gamesPerRound: new[] { 2, 2, 2 },
             courts: 1
         );
+        tournament.Warmup = TimeSpan.Zero;
 
-        // Act
         var result = _service.CalculateRounds(tournament);
 
-        // Assert
         result.Should().HaveCount(3);
         result[0].RoundNumber.Should().Be(1);
         result[1].RoundNumber.Should().Be(3);
         result[2].RoundNumber.Should().Be(5);
-        
-        // Each should still be calculated sequentially
-        result[0].StartTime.Should().Be(new TimeOnly(9, 0, 0));
-        result[1].StartTime.Should().Be(new TimeOnly(9, 35, 0));
-        result[2].StartTime.Should().Be(new TimeOnly(10, 10, 0));
+
+        // Rounds are still sequential in time regardless of round numbers
+        result[1].StartTime.Should().BeAfter(result[0].EndTime);
+        result[2].StartTime.Should().BeAfter(result[1].EndTime);
     }
 
     [Fact]
-    public void CalculateRounds_WithUnevenGameDistribution_CalculatesCorrectly()
+    public void CalculateRounds_GameCountReflectsActualGamesInRound()
     {
-        // Arrange
         var tournament = CreateTournamentWithGames(
             startDate: new DateTime(2025, 11, 22),
             startTime: new TimeSpan(9, 0, 0),
+            endTime: new TimeSpan(10, 30, 0),
             rounds: new[] { 1, 2 },
-            gamesPerRound: new[] { 5, 1 }, // 5 games then 1 game
+            gamesPerRound: new[] { 5, 1 },
             courts: 2
         );
 
-        // Act
         var result = _service.CalculateRounds(tournament);
 
-        // Assert
         result.Should().HaveCount(2);
-        
-        // Round 1: 5 games / 2 courts = 3 games per court (ceiling) × 15 min = 45 min
         result[0].GameCount.Should().Be(5);
-        result[0].EndTime.Should().Be(new TimeOnly(9, 45, 0));
-        
-        // Round 2: 1 game / 2 courts = 1 game per court × 15 min = 15 min
         result[1].GameCount.Should().Be(1);
-        result[1].StartTime.Should().Be(new TimeOnly(9, 50, 0));
+    }
+
+    [Fact]
+    public void CalculateRounds_WithDefaultWarmup_UsesFiveMinutes()
+    {
+        // warmup = null → defaults to 5 min; first round starts at startTime + 5 min
+        var tournament = CreateTournamentWithGames(
+            startDate: new DateTime(2025, 11, 22),
+            startTime: new TimeSpan(9, 0, 0),
+            endTime: new TimeSpan(10, 0, 0),
+            rounds: new[] { 1 },
+            gamesPerRound: new[] { 2 },
+            courts: 1
+        );
+        // tournament.Warmup is intentionally left null
+
+        var result = _service.CalculateRounds(tournament);
+
+        result.Should().HaveCount(1);
+        result[0].StartTime.Should().Be(new TimeOnly(9, 5, 0));
+    }
+
+    [Fact]
+    public void CalculateRounds_WithZeroWarmup_StartsAtTournamentStartTime()
+    {
+        // 9:00–10:05 = 65 min, warmup 0, 2 rounds, 1 break (5 min)
+        // available = 65 - 0 - 5 = 60, roundDuration = 30 min
+        // Round 1: 9:00–9:30, Round 2: 9:35–10:05
+        var tournament = CreateTournamentWithGames(
+            startDate: new DateTime(2025, 11, 22),
+            startTime: new TimeSpan(9, 0, 0),
+            endTime: new TimeSpan(10, 5, 0),
+            rounds: new[] { 1, 2 },
+            gamesPerRound: new[] { 2, 2 },
+            courts: 1
+        );
+        tournament.Warmup = TimeSpan.Zero;
+
+        var result = _service.CalculateRounds(tournament);
+
+        result.Should().HaveCount(2);
+        result[0].StartTime.Should().Be(new TimeOnly(9, 0, 0));
+        result[0].EndTime.Should().Be(new TimeOnly(9, 30, 0));
+        result[1].StartTime.Should().Be(new TimeOnly(9, 35, 0));
         result[1].EndTime.Should().Be(new TimeOnly(10, 5, 0));
     }
 
     [Fact]
-    public void CalculateRounds_WithWarmup_AddsWarmupTimeToStartTime()
+    public void CalculateRounds_WithExplicitWarmup_ShiftsFirstRoundStart()
     {
-        // Arrange
-        var warmupDuration = new TimeSpan(0, 5, 0); // 5 minutes warmup
+        // 9:00–10:00 = 60 min, warmup 5 min, 1 round
+        // available = 55 min → Round 1: 9:05–10:00
         var tournament = CreateTournamentWithGames(
             startDate: new DateTime(2025, 11, 22),
             startTime: new TimeSpan(9, 0, 0),
+            endTime: new TimeSpan(10, 0, 0),
             rounds: new[] { 1 },
             gamesPerRound: new[] { 2 },
             courts: 1
         );
-        tournament.Warmup = warmupDuration;
+        tournament.Warmup = new TimeSpan(0, 5, 0);
 
-        // Act
         var result = _service.CalculateRounds(tournament);
 
-        // Assert
         result.Should().HaveCount(1);
-        // Start time should be 9:00 + 5 min warmup = 9:05
         result[0].StartTime.Should().Be(new TimeOnly(9, 5, 0));
-        // End time: 9:05 + 30 min (2 games × 15 min) = 9:35
-        result[0].EndTime.Should().Be(new TimeOnly(9, 35, 0));
+        result[0].EndTime.Should().Be(new TimeOnly(10, 0, 0));
     }
 
     [Fact]
-    public void CalculateRounds_WithWarmup_AffectsAllRounds()
+    public void CalculateRounds_WithExplicitWarmup_AffectsAvailableTimeForAllRounds()
     {
-        // Arrange
-        var warmupDuration = new TimeSpan(0, 10, 0); // 10 minutes warmup
+        // 9:00–11:05 = 125 min, warmup 10 min, 3 rounds, 2 breaks (10 min)
+        // available = 125 - 10 - 10 = 105, roundDuration = 35 min
+        // Round 1: 9:10–9:45, Round 2: 9:50–10:25, Round 3: 10:30–11:05
         var tournament = CreateTournamentWithGames(
             startDate: new DateTime(2025, 11, 22),
             startTime: new TimeSpan(9, 0, 0),
+            endTime: new TimeSpan(11, 5, 0),
             rounds: new[] { 1, 2, 3 },
             gamesPerRound: new[] { 2, 2, 2 },
             courts: 1
         );
-        tournament.Warmup = warmupDuration;
+        tournament.Warmup = new TimeSpan(0, 10, 0);
 
-        // Act
         var result = _service.CalculateRounds(tournament);
 
-        // Assert
         result.Should().HaveCount(3);
-        
-        // Round 1: starts at 9:10 (9:00 + 10 min warmup)
         result[0].StartTime.Should().Be(new TimeOnly(9, 10, 0));
-        result[0].EndTime.Should().Be(new TimeOnly(9, 40, 0));
-        
-        // Round 2: starts at 9:45 (9:40 + 5 min break)
-        result[1].StartTime.Should().Be(new TimeOnly(9, 45, 0));
-        result[1].EndTime.Should().Be(new TimeOnly(10, 15, 0));
-        
-        // Round 3: starts at 10:20 (10:15 + 5 min break)
-        result[2].StartTime.Should().Be(new TimeOnly(10, 20, 0));
-        result[2].EndTime.Should().Be(new TimeOnly(10, 50, 0));
-    }
-
-    [Fact]
-    public void CalculateRounds_WithNoWarmup_DoesNotAffectStartTime()
-    {
-        // Arrange
-        var tournament = CreateTournamentWithGames(
-            startDate: new DateTime(2025, 11, 22),
-            startTime: new TimeSpan(9, 0, 0),
-            rounds: new[] { 1 },
-            gamesPerRound: new[] { 2 },
-            courts: 1
-        );
-        tournament.Warmup = null; // No warmup
-
-        // Act
-        var result = _service.CalculateRounds(tournament);
-
-        // Assert
-        result.Should().HaveCount(1);
-        // Start time should be exactly 9:00 with no warmup
-        result[0].StartTime.Should().Be(new TimeOnly(9, 0, 0));
-        result[0].EndTime.Should().Be(new TimeOnly(9, 30, 0));
-    }
-
-    [Fact]
-    public void CalculateRounds_WithShortWarmup_CalculatesCorrectly()
-    {
-        // Arrange
-        var warmupDuration = new TimeSpan(0, 2, 30); // 2 minutes 30 seconds
-        var tournament = CreateTournamentWithGames(
-            startDate: new DateTime(2025, 11, 22),
-            startTime: new TimeSpan(10, 30, 0),
-            rounds: new[] { 1, 2 },
-            gamesPerRound: new[] { 4, 2 },
-            courts: 2
-        );
-        tournament.Warmup = warmupDuration;
-
-        // Act
-        var result = _service.CalculateRounds(tournament);
-
-        // Assert
-        result.Should().HaveCount(2);
-        
-        // Round 1: starts at 10:32:30 (10:30 + 2:30 warmup)
-        result[0].StartTime.Should().Be(new TimeOnly(10, 32, 30));
-        // 4 games / 2 courts = 30 minutes, so ends at 11:02:30
-        result[0].EndTime.Should().Be(new TimeOnly(11, 2, 30));
-        
-        // Round 2: starts at 11:07:30 (11:02:30 + 5 min break)
-        result[1].StartTime.Should().Be(new TimeOnly(11, 7, 30));
+        result[0].EndTime.Should().Be(new TimeOnly(9, 45, 0));
+        result[1].StartTime.Should().Be(new TimeOnly(9, 50, 0));
+        result[1].EndTime.Should().Be(new TimeOnly(10, 25, 0));
+        result[2].StartTime.Should().Be(new TimeOnly(10, 30, 0));
+        result[2].EndTime.Should().Be(new TimeOnly(11, 5, 0));
     }
 
     [Fact]
     public void CalculateRounds_LogsInformation()
     {
-        // Arrange
         var tournament = CreateTournamentWithGames(
             startDate: new DateTime(2025, 11, 22),
             startTime: new TimeSpan(9, 0, 0),
+            endTime: new TimeSpan(10, 30, 0),
             rounds: new[] { 1, 2 },
             gamesPerRound: new[] { 2, 2 },
             courts: 1
         );
 
-        // Act
         _service.CalculateRounds(tournament);
 
-        // Assert
         _loggerMock.Verify(
             x => x.Log(
                 LogLevel.Information,
@@ -379,6 +365,7 @@ public class RoundCalculationServiceTests
     private Tournament CreateTournamentWithGames(
         DateTime? startDate,
         TimeSpan? startTime,
+        TimeSpan? endTime,
         int[] rounds,
         int[] gamesPerRound,
         int courts)
@@ -389,6 +376,7 @@ public class RoundCalculationServiceTests
             Name = "Test Tournament",
             StartDate = startDate,
             StartTime = startTime,
+            EndTime = endTime,
             Pairs = new List<TournamentPair>()
         };
 
@@ -400,13 +388,10 @@ public class RoundCalculationServiceTests
             var roundNumber = rounds[i];
             var gameCount = gamesPerRound[i];
 
-            // Create pairs with games for this round
-            // Each game involves 2 pairs, so we create games in pair-centered structure
             for (int gameNum = 0; gameNum < gameCount; gameNum++)
             {
                 var court = (gameNum % courts) + 1;
-                
-                // Create or get pair 1
+
                 var pair1Id = $"pair-{pairId}";
                 var pair1 = tournament.Pairs.FirstOrDefault(p => p.Id == pair1Id);
                 if (pair1 == null)
@@ -425,7 +410,6 @@ public class RoundCalculationServiceTests
                     pairId++;
                 }
 
-                // Create or get pair 2
                 var pair2Id = $"pair-{pairId}";
                 var pair2 = tournament.Pairs.FirstOrDefault(p => p.Id == pair2Id);
                 if (pair2 == null)
@@ -444,7 +428,6 @@ public class RoundCalculationServiceTests
                     pairId++;
                 }
 
-                // Add game to pair1's perspective
                 pair1.Games.Add(new PairGame
                 {
                     Id = $"game-{gameId}",
@@ -454,7 +437,6 @@ public class RoundCalculationServiceTests
                     OpponentPair = pair2.PairInfo
                 });
 
-                // Add game to pair2's perspective
                 pair2.Games.Add(new PairGame
                 {
                     Id = $"game-{gameId}",

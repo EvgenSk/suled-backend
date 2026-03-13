@@ -92,7 +92,7 @@ resource cosmosContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/con
       id: 'Tournaments'
       partitionKey: {
         paths: [
-          '/id'
+          '/pk'
         ]
         kind: 'Hash'
       }
