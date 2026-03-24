@@ -9,32 +9,23 @@ namespace SuledFunctions.Functions;
 /// <summary>
 /// HTTP Function to get a tournament by ID
 /// </summary>
-public class GetTournamentFunction
+public class GetTournamentFunction(ITournamentService tournamentService, ILogger<GetTournamentFunction> logger)
 {
-    private readonly ITournamentService _tournamentService;
-    private readonly ILogger<GetTournamentFunction> _logger;
-
-    public GetTournamentFunction(ITournamentService tournamentService, ILogger<GetTournamentFunction> logger)
-    {
-        _tournamentService = tournamentService;
-        _logger = logger;
-    }
-
     [Function("GetTournament")]
     public async Task<HttpResponseData> Run(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "tournament/{id}")] 
         HttpRequestData req,
         string id)
     {
-        _logger.LogInformation("Getting tournament with ID: {TournamentId}", id);
+        logger.LogInformation("Getting tournament with ID: {TournamentId}", id);
 
         try
         {
-            var tournament = await _tournamentService.GetTournamentByIdAsync(id);
+            var tournament = await tournamentService.GetTournamentByIdAsync(id);
 
             if (tournament == null)
             {
-                _logger.LogWarning("Tournament not found: {TournamentId}", id);
+                logger.LogWarning("Tournament not found: {TournamentId}", id);
                 var notFoundResponse = req.CreateResponse(HttpStatusCode.NotFound);
                 await notFoundResponse.WriteAsJsonAsync(new { error = $"Tournament with ID '{id}' not found" });
                 return notFoundResponse;
@@ -46,7 +37,7 @@ public class GetTournamentFunction
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving tournament {TournamentId}", id);
+            logger.LogError(ex, "Error retrieving tournament {TournamentId}", id);
             var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
             await errorResponse.WriteAsJsonAsync(new { error = "Failed to retrieve tournament" });
             return errorResponse;

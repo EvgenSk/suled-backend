@@ -6,8 +6,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using SuledFunctions.Functions;
-using SuledFunctions.Models;
-using SuledFunctions.Models.Optimized;
+using SuledFunctions.Models.DTOs;
+using SuledFunctions.Services.Interfaces;
 using SuledFunctions.Tests.Helpers;
 using System.Net;
 using System.Text.Json;
@@ -16,28 +16,40 @@ namespace SuledFunctions.Tests.Functions;
 
 public class GetGamesForPairFunctionTests
 {
+    private readonly Mock<IGamesService> _gamesServiceMock;
     private readonly Mock<ILogger<GetGamesForPairFunction>> _loggerMock;
     private readonly GetGamesForPairFunction _function;
 
     public GetGamesForPairFunctionTests()
     {
+        _gamesServiceMock = new Mock<IGamesService>();
         _loggerMock = new Mock<ILogger<GetGamesForPairFunction>>();
-        _function = new GetGamesForPairFunction(_loggerMock.Object);
+        _function = new GetGamesForPairFunction(_gamesServiceMock.Object, _loggerMock.Object);
     }
 
     [Fact]
-    public async Task Run_WithValidPairId_ReturnsMatchingGames()
+    public async Task Run_WithValidPairId_ReturnsOkStatus()
     {
-        // Arrange
-        var (tournaments, pairId) = CreateTestTournamentsWithPair();
+        var pairId = "pair-1";
+        _gamesServiceMock.Setup(s => s.GetGamesForPairAsync(pairId))
+            .ReturnsAsync(new[] { CreateGame("g1"), CreateGame("g2") });
         var requestMock = CreateMockRequest();
 
-        // Act
-        var response = await _function.Run(requestMock.Object, pairId, tournaments);
+        var response = await _function.Run(requestMock.Object, pairId);
 
-        // Assert
         response.Should().NotBeNull();
         response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Run_WithValidPairId_ReturnsCorrectResponseShape()
+    {
+        var pairId = "pair-1";
+        _gamesServiceMock.Setup(s => s.GetGamesForPairAsync(pairId))
+            .ReturnsAsync(new[] { CreateGame("g1", round: 1), CreateGame("g2", round: 2) });
+        var requestMock = CreateMockRequest();
+
+        var response = await _function.Run(requestMock.Object, pairId);
 
         var content = await GetResponseContent(response);
         content!.RootElement.GetProperty("pairId").GetString().Should().Be(pairId);
@@ -46,16 +58,15 @@ public class GetGamesForPairFunctionTests
     }
 
     [Fact]
-    public async Task Run_WithNonExistentPairId_ReturnsEmptyList()
+    public async Task Run_WithNoGames_ReturnsEmptyList()
     {
-        // Arrange
-        var (tournaments, _) = CreateTestTournamentsWithPair();
+        var pairId = "non-existent-pair";
+        _gamesServiceMock.Setup(s => s.GetGamesForPairAsync(pairId))
+            .ReturnsAsync(Enumerable.Empty<GameDto>());
         var requestMock = CreateMockRequest();
 
-        // Act
-        var response = await _function.Run(requestMock.Object, "non-existent-pair", tournaments);
+        var response = await _function.Run(requestMock.Object, pairId);
 
-        // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var content = await GetResponseContent(response);
         content!.RootElement.GetProperty("totalGames").GetInt32().Should().Be(0);
@@ -63,165 +74,31 @@ public class GetGamesForPairFunctionTests
     }
 
     [Fact]
-    public async Task Run_OrdersGamesByRoundThenCourtNumber()
+    public async Task Run_WhenServiceThrows_ReturnsInternalServerError()
     {
-        // Arrange
-        var player1 = new Player { Name = "John", Surname = "Doe" };
-        var player2 = new Player { Name = "Jane", Surname = "Smith" };
-        var targetPair = new Pair { Player1 = player1, Player2 = player2 };
-        var pairId = targetPair.Id; // trigger deterministic hash generation
-
-        var player3 = new Player { Name = "Alice", Surname = "Brown" };
-        var player4 = new Player { Name = "Bob", Surname = "White" };
-        var otherPair = new Pair { Player1 = player3, Player2 = player4 };
-        _ = otherPair.Id;
-
-        var tournament = new Tournament
-        {
-            Id = "test-1",
-            Name = "Test Tournament",
-            Pairs = new List<TournamentPair>
-            {
-                new TournamentPair
-                {
-                    PairInfo = targetPair,
-                    Games = new List<PairGame>
-                    {
-                        new PairGame { Id = "g3", TournamentId = "test-1", Round = 2, CourtNumber = 2, OpponentPair = otherPair },
-                        new PairGame { Id = "g1", TournamentId = "test-1", Round = 1, CourtNumber = 1, OpponentPair = otherPair },
-                        new PairGame { Id = "g4", TournamentId = "test-1", Round = 2, CourtNumber = 3, OpponentPair = otherPair },
-                        new PairGame { Id = "g2", TournamentId = "test-1", Round = 1, CourtNumber = 2, OpponentPair = otherPair }
-                    }
-                },
-                new TournamentPair { PairInfo = otherPair, Games = new List<PairGame>() }
-            }
-        };
-
+        var pairId = "pair-1";
+        _gamesServiceMock.Setup(s => s.GetGamesForPairAsync(pairId))
+            .ThrowsAsync(new Exception("Service failed"));
         var requestMock = CreateMockRequest();
 
-        // Act
-        var response = await _function.Run(requestMock.Object, pairId, new[] { TournamentCompactMapper.ToCompact(tournament) });
+        var response = await _function.Run(requestMock.Object, pairId);
 
-        // Assert
-        var content = await GetResponseContent(response);
-        var games = content!.RootElement.GetProperty("games").EnumerateArray().ToList();
-        
-        games.Should().HaveCount(4);
-        
-        // Verify ordering: Round 1 Court 1, Round 1 Court 2, Round 2 Court 2, Round 2 Court 3
-        games[0].GetProperty("round").GetInt32().Should().Be(1);
-        games[0].GetProperty("courtNumber").GetInt32().Should().Be(1);
-        
-        games[1].GetProperty("round").GetInt32().Should().Be(1);
-        games[1].GetProperty("courtNumber").GetInt32().Should().Be(2);
-        
-        games[2].GetProperty("round").GetInt32().Should().Be(2);
-        games[2].GetProperty("courtNumber").GetInt32().Should().Be(2);
-        
-        games[3].GetProperty("round").GetInt32().Should().Be(2);
-        games[3].GetProperty("courtNumber").GetInt32().Should().Be(3);
-    }
-
-    [Fact]
-    public async Task Run_IncludesIsOurGameFlag_WhenPairIsPair1()
-    {
-        // Arrange
-        var player1 = new Player { Name = "John", Surname = "Doe" };
-        var player2 = new Player { Name = "Jane", Surname = "Smith" };
-        var targetPair = new Pair { Player1 = player1, Player2 = player2 };
-        var pairId = targetPair.Id;
-
-        var player3 = new Player { Name = "Alice", Surname = "Brown" };
-        var player4 = new Player { Name = "Bob", Surname = "White" };
-        var otherPair = new Pair { Player1 = player3, Player2 = player4 };
-        _ = otherPair.Id;
-
-        var tournament = new Tournament
-        {
-            Id = "test-1",
-            Name = "Test Tournament",
-            Pairs = new List<TournamentPair>
-            {
-                new TournamentPair
-                {
-                    PairInfo = targetPair,
-                    Games = new List<PairGame>
-                    {
-                        new PairGame { Id = "g1", TournamentId = "test-1", Round = 1, CourtNumber = 1, OpponentPair = otherPair }
-                    }
-                },
-                new TournamentPair { PairInfo = otherPair, Games = new List<PairGame>() }
-            }
-        };
-
-        var requestMock = CreateMockRequest();
-
-        // Act
-        var response = await _function.Run(requestMock.Object, pairId, new[] { TournamentCompactMapper.ToCompact(tournament) });
-
-        // Assert
-        var content = await GetResponseContent(response);
-        var game = content!.RootElement.GetProperty("games")[0];
-        game.GetProperty("isOurGame").GetBoolean().Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task Run_IncludesIsOurGameFlag_Always()
-    {
-        // Arrange - in pair-centered model, games are always from the pair's perspective
-        var player1 = new Player { Name = "John", Surname = "Doe" };
-        var player2 = new Player { Name = "Jane", Surname = "Smith" };
-        var targetPair = new Pair { Player1 = player1, Player2 = player2 };
-        var pairId = targetPair.Id;
-
-        var player3 = new Player { Name = "Alice", Surname = "Brown" };
-        var player4 = new Player { Name = "Bob", Surname = "White" };
-        var otherPair = new Pair { Player1 = player3, Player2 = player4 };
-        _ = otherPair.Id;
-
-        var tournament = new Tournament
-        {
-            Id = "test-1",
-            Name = "Test Tournament",
-            Pairs = new List<TournamentPair>
-            {
-                new TournamentPair
-                {
-                    PairInfo = targetPair,
-                    Games = new List<PairGame>
-                    {
-                        new PairGame { Id = "g1", TournamentId = "test-1", Round = 1, CourtNumber = 1, OpponentPair = otherPair }
-                    }
-                },
-                new TournamentPair { PairInfo = otherPair, Games = new List<PairGame>() }
-            }
-        };
-
-        var requestMock = CreateMockRequest();
-
-        // Act
-        var response = await _function.Run(requestMock.Object, pairId, new[] { TournamentCompactMapper.ToCompact(tournament) });
-
-        // Assert - in pair-centered model, games are always from the pair's perspective
-        var content = await GetResponseContent(response);
-        var game = content!.RootElement.GetProperty("games")[0];
-        game.GetProperty("isOurGame").GetBoolean().Should().BeTrue();
+        response.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
     }
 
     [Fact]
     public async Task Run_IncludesAllRequiredGameFields()
     {
-        // Arrange
-        var (tournaments, pairId) = CreateTestTournamentsWithPair();
+        var pairId = "pair-1";
+        _gamesServiceMock.Setup(s => s.GetGamesForPairAsync(pairId))
+            .ReturnsAsync(new[] { CreateGame("g1") });
         var requestMock = CreateMockRequest();
 
-        // Act
-        var response = await _function.Run(requestMock.Object, pairId, tournaments);
+        var response = await _function.Run(requestMock.Object, pairId);
 
-        // Assert
         var content = await GetResponseContent(response);
         var game = content!.RootElement.GetProperty("games")[0];
-        
+
         game.TryGetProperty("id", out _).Should().BeTrue();
         game.TryGetProperty("round", out _).Should().BeTrue();
         game.TryGetProperty("courtNumber", out _).Should().BeTrue();
@@ -235,14 +112,13 @@ public class GetGamesForPairFunctionTests
     [Fact]
     public async Task Run_LogsInformationWithPairId()
     {
-        // Arrange
-        var (tournaments, pairId) = CreateTestTournamentsWithPair();
+        var pairId = "pair-1";
+        _gamesServiceMock.Setup(s => s.GetGamesForPairAsync(pairId))
+            .ReturnsAsync(Enumerable.Empty<GameDto>());
         var requestMock = CreateMockRequest();
 
-        // Act
-        await _function.Run(requestMock.Object, pairId, tournaments);
+        await _function.Run(requestMock.Object, pairId);
 
-        // Assert
         _loggerMock.Verify(
             x => x.Log(
                 LogLevel.Information,
@@ -254,65 +130,55 @@ public class GetGamesForPairFunctionTests
     }
 
     [Fact]
-    public async Task Run_WithEmptyTournaments_ReturnsEmptyList()
+    public async Task Run_PassesPairIdToService()
     {
-        // Arrange
-        var pairId = "pair-1";
-        var tournaments = Enumerable.Empty<TournamentCompact>();
+        var pairId = "pair-abc";
+        _gamesServiceMock.Setup(s => s.GetGamesForPairAsync(It.IsAny<string>()))
+            .ReturnsAsync(Enumerable.Empty<GameDto>());
         var requestMock = CreateMockRequest();
 
-        // Act
-        var response = await _function.Run(requestMock.Object, pairId, tournaments);
+        await _function.Run(requestMock.Object, pairId);
 
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var content = await GetResponseContent(response);
-        content!.RootElement.GetProperty("totalGames").GetInt32().Should().Be(0);
+        _gamesServiceMock.Verify(s => s.GetGamesForPairAsync(pairId), Times.Once);
     }
 
-    [Fact]
-    public async Task Run_WithMultipleTournaments_ReturnsAllMatchingGames()
+    private static GameDto CreateGame(string id, int round = 1, int courtNumber = 1) => new()
     {
-        // Arrange
-        var (tournament1, pairId) = CreateSingleTournamentWithPair("t1");
-        var (tournament2, _) = CreateSingleTournamentWithPair("t2");
-        var requestMock = CreateMockRequest();
-
-        // Act
-        var response = await _function.Run(requestMock.Object, pairId, new[] { tournament1, tournament2 });
-
-        // Assert
-        var content = await GetResponseContent(response);
-        content!.RootElement.GetProperty("totalGames").GetInt32().Should().Be(4); // 2 games per tournament
-    }
+        Id = id,
+        Round = round,
+        CourtNumber = courtNumber,
+        Status = "Scheduled",
+        Pair1 = "John Doe / Jane Smith",
+        Pair2 = "Alice Brown / Bob White",
+        IsOurGame = true
+    };
 
     private Mock<HttpRequestData> CreateMockRequest()
     {
         var serviceCollection = new ServiceCollection();
         serviceCollection.AddScoped<ILoggerFactory, LoggerFactory>();
-        
-        // Configure serializer for WriteAsJsonAsync
+
         var workerOptions = Options.Create(new Microsoft.Azure.Functions.Worker.WorkerOptions
         {
             Serializer = new TestJsonSerializer()
         });
         serviceCollection.AddSingleton(workerOptions);
-        
+
         var serviceProvider = serviceCollection.BuildServiceProvider();
-        
+
         var context = new Mock<FunctionContext>();
         context.SetupProperty(c => c.InstanceServices, serviceProvider);
-        
+
         var requestMock = new Mock<HttpRequestData>(context.Object);
-        
+
         var responseStream = new MemoryStream();
         var responseMock = new Mock<HttpResponseData>(context.Object);
         responseMock.SetupProperty(r => r.StatusCode);
         responseMock.SetupProperty(r => r.Body, responseStream);
         responseMock.Setup(r => r.Headers).Returns(new HttpHeadersCollection());
-        
+
         requestMock.Setup(r => r.CreateResponse()).Returns(responseMock.Object);
-        
+
         return requestMock;
     }
 
@@ -321,56 +187,10 @@ public class GetGamesForPairFunctionTests
         response.Body.Position = 0;
         using var reader = new StreamReader(response.Body);
         var content = await reader.ReadToEndAsync();
-        
+
         if (string.IsNullOrEmpty(content))
             return null;
-        
+
         return JsonDocument.Parse(content);
-    }
-
-    private (IEnumerable<TournamentCompact> Tournaments, string PairId) CreateTestTournamentsWithPair()
-    {
-        var (tournament, pairId) = CreateSingleTournamentWithPair("test-1");
-        return (new[] { tournament }, pairId);
-    }
-
-    private (TournamentCompact Tournament, string PairId) CreateSingleTournamentWithPair(string tournamentId)
-    {
-        var player1 = new Player { Name = "John", Surname = "Doe" };
-        var player2 = new Player { Name = "Jane", Surname = "Smith" };
-        var targetPair = new Pair { Player1 = player1, Player2 = player2 };
-        var realPairId = targetPair.Id; // trigger deterministic hash generation
-
-        var player3 = new Player { Name = "Alice", Surname = "Brown" };
-        var player4 = new Player { Name = "Bob", Surname = "White" };
-        var otherPair = new Pair { Player1 = player3, Player2 = player4 };
-        _ = otherPair.Id;
-
-        // Create pair-centered structure
-        var tournament = new Tournament
-        {
-            Id = tournamentId,
-            Name = $"Tournament {tournamentId}",
-            Pairs = new List<TournamentPair>
-            {
-                new TournamentPair
-                {
-                    PairInfo = targetPair,
-                    Games = new List<PairGame>
-                    {
-                        new PairGame { Id = $"{tournamentId}-g1", TournamentId = tournamentId, Round = 1, CourtNumber = 1, OpponentPair = otherPair, Status = GameStatus.Scheduled },
-                        new PairGame { Id = $"{tournamentId}-g2", TournamentId = tournamentId, Round = 2, CourtNumber = 1, OpponentPair = targetPair, Status = GameStatus.Scheduled }
-                    }
-                },
-                // Opponent pair must also exist in the Pairs list for the compact mapper
-                new TournamentPair
-                {
-                    PairInfo = otherPair,
-                    Games = new List<PairGame>()
-                }
-            }
-        };
-
-        return (TournamentCompactMapper.ToCompact(tournament), realPairId);
     }
 }

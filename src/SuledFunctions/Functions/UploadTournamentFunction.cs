@@ -8,8 +8,6 @@ using SuledFunctions.Common;
 using SuledFunctions.Configuration;
 using SuledFunctions.Exceptions;
 using SuledFunctions.Services.Interfaces;
-using SuledFunctions.Repositories;
-using SuledFunctions.Models.Optimized;
 using SuledFunctions.Models.DTOs;
 using SuledFunctions.Validators;
 
@@ -18,54 +16,40 @@ namespace SuledFunctions.Functions;
 /// <summary>
 /// HTTP Function to upload tournament Excel file
 /// </summary>
-public class UploadTournamentFunction
+public class UploadTournamentFunction(
+    ITournamentUploadService uploadService,
+    IOptions<TournamentSettings> settings,
+    IValidator<Stream> fileValidator,
+    ILogger<UploadTournamentFunction> logger)
 {
-    private readonly IExcelParserService _excelParser;
-    private readonly ITournamentRepository _repository;
-    private readonly ILogger<UploadTournamentFunction> _logger;
-    private readonly TournamentSettings _settings;
-    private readonly IValidator<Stream> _fileValidator;
-
-    public UploadTournamentFunction(
-        IExcelParserService excelParser,
-        ITournamentRepository repository,
-        IOptions<TournamentSettings> settings,
-        IValidator<Stream> fileValidator,
-        ILogger<UploadTournamentFunction> logger)
-    {
-        _excelParser = excelParser;
-        _repository = repository;
-        _logger = logger;
-        _settings = settings.Value;
-        _fileValidator = fileValidator;
-    }
+    private readonly TournamentSettings _settings = settings.Value;
 
     [Function("UploadTournament")]
     public async Task<HttpResponseData> Run(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "tournament/upload")] 
         HttpRequestData req)
     {
-        _logger.LogInformation("Processing tournament upload request");
+        logger.LogInformation("Processing tournament upload request");
 
         // Validate Content-Type header
         if (!req.Headers.TryGetValues(Constants.Http.HeaderContentType, out var contentTypeValues))
         {
-            _logger.LogWarning("Missing Content-Type header");
+            logger.LogWarning("Missing Content-Type header");
             throw new Exceptions.ValidationException(Constants.Http.HeaderContentType, Constants.ErrorMessages.MissingContentType);
         }
 
         var contentType = contentTypeValues.FirstOrDefault();
         if (string.IsNullOrEmpty(contentType) || !contentType.Contains(Constants.Http.ContentTypeMultipartFormData, StringComparison.OrdinalIgnoreCase))
         {
-            _logger.LogWarning("Invalid Content-Type: {ContentType}", contentType);
+            logger.LogWarning("Invalid Content-Type: {ContentType}", contentType);
             throw new Exceptions.ValidationException(Constants.Http.HeaderContentType, Constants.ErrorMessages.InvalidContentType);
         }
 
-        _logger.LogInformation("Request received");
+        logger.LogInformation("Request received");
         
         using var memoryStream = new MemoryStream();
         
-        _logger.LogInformation("Reading file from request body");
+        logger.LogInformation("Reading file from request body");
         
         // Set a timeout for reading
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_settings.RequestTimeoutSeconds));
@@ -75,16 +59,16 @@ public class UploadTournamentFunction
         }
         catch (OperationCanceledException)
         {
-            _logger.LogError("Timeout reading request body");
+            logger.LogError("Timeout reading request body");
             throw new FileProcessingException(Constants.ErrorMessages.RequestTimeout);
         }
         
-        _logger.LogInformation("Received {ByteCount} bytes", memoryStream.Length);
+        logger.LogInformation("Received {ByteCount} bytes", memoryStream.Length);
         
         memoryStream.Position = 0;
 
         // Validate file using FileUploadValidator
-        var validationResult = await _fileValidator.ValidateAsync(memoryStream);
+        var validationResult = await fileValidator.ValidateAsync(memoryStream);
         if (!validationResult.IsValid)
         {
             var errors = validationResult.Errors
@@ -96,7 +80,7 @@ public class UploadTournamentFunction
 
         // Extract filename from Content-Disposition header if present
         var fileName = ExtractFileName(req);
-        _logger.LogInformation("Processing file: {FileName}", fileName);
+        logger.LogInformation("Processing file: {FileName}", fileName);
 
         // Validate file extension (.xlsx / .xls only)
         if (!FileUploadValidator.ValidateFileExtension(fileName))
@@ -104,33 +88,25 @@ public class UploadTournamentFunction
             throw new Exceptions.ValidationException("fileName", Constants.ErrorMessages.InvalidFileType);
         }
 
-        _logger.LogInformation("Parsing tournament from file");
+        logger.LogInformation("Parsing tournament from file");
         
         try
         {
-            // Parse the tournament
-            var tournament = await _excelParser.ParseTournamentAsync(memoryStream, fileName);
+            var result = await uploadService.UploadAsync(memoryStream, fileName);
 
-            // Convert to compact format for storage (80-94% size reduction)
-            var compactTournament = TournamentCompactMapper.ToCompact(tournament);
+            logger.LogInformation("Tournament {TournamentId} saved with {PairCount} pairs",
+                result.Id, result.PairCount);
 
-            // Save compact format using repository
-            await _repository.CreateAsync(compactTournament);
-
-            _logger.LogInformation("Tournament {TournamentId} saved to Cosmos DB in compact format with {PairCount} pairs",
-                tournament.Id, tournament.Pairs.Count);
-
-            // Create success response using unified response model
             var responseData = new
             {
-                id = tournament.Id,
-                name = tournament.Name,
-                gameCount = tournament.Pairs.Sum(p => p.Games.Count),
-                pairCount = tournament.Pairs.Count
+                id = result.Id,
+                name = result.Name,
+                gameCount = result.GameCount,
+                pairCount = result.PairCount
             };
 
             var apiResponse = CreatedResponse<dynamic>.Created(
-                tournament.Id,
+                result.Id,
                 responseData,
                 Constants.SuccessMessages.TournamentUploaded);
 
@@ -140,7 +116,7 @@ public class UploadTournamentFunction
         }
         catch (Exception ex) when (ex is not AppException)
         {
-            _logger.LogError(ex, "Error parsing or saving tournament");
+            logger.LogError(ex, "Error parsing or saving tournament");
             throw new FileProcessingException(Constants.ErrorMessages.ProcessingError, ex, fileName);
         }
     }
