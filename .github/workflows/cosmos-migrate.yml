@@ -1,10 +1,13 @@
 name: Cosmos DB – Reset Tournaments Container
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ONE-TIME workflow: deletes the Tournaments container so the regular
-# backend-ci "infrastructure" job can recreate it with partition key /pk.
+# Deletes the Tournaments container so backend-ci can recreate it with
+# partition key /pk via Bicep.
 #
-# Run this ONCE before pushing the /pk code change to main.
+# After running this workflow:
+#   dev:  push any change to develop — infrastructure-dev job recreates it
+#   prod: push any change to main    — infrastructure job recreates it
+#
 # No data will be lost — there is nothing to preserve.
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -46,10 +49,11 @@ jobs:
         RESOURCE_GROUP: ${{ inputs.environment == 'prod' && vars.AZURE_RESOURCE_GROUP || vars.AZURE_RESOURCE_GROUP_DEV }}
         COSMOS_ACCOUNT:  ${{ inputs.environment == 'prod' && vars.COSMOS_ACCOUNT_NAME || vars.COSMOS_ACCOUNT_NAME_DEV }}
       run: |
+        DB_NAME=${{ inputs.environment == 'prod' && 'TournamentDb' || 'TournamentDb-dev' }}
         az cosmosdb sql container delete \
           --account-name   "$COSMOS_ACCOUNT" \
           --resource-group "$RESOURCE_GROUP" \
-          --database-name  TournamentDb \
+          --database-name  "$DB_NAME" \
           --name           Tournaments \
           --yes
-        echo "✅ Container deleted — push to main to recreate it with partition key /pk"
+        echo "✅ Container deleted — push to ${{ inputs.environment == 'prod' && 'main' || 'develop' }} to recreate it with partition key /pk"

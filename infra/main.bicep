@@ -72,13 +72,15 @@ resource cosmosDbAccount 'Microsoft.DocumentDB/databaseAccounts@2025-04-15' = {
   }
 }
 
+var dbName = environment == 'prod' ? 'TournamentDb' : 'TournamentDb-dev'
+
 // Cosmos DB Database
 resource cosmosDb 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2025-04-15' = {
   parent: cosmosDbAccount
-  name: 'TournamentDb'
+  name: dbName
   properties: {
     resource: {
-      id: 'TournamentDb'
+      id: dbName
     }
   }
 }

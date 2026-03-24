@@ -1,7 +1,7 @@
 using './main.bicep'
 
 // appName will use default with uniqueString for globally unique names
-param environment = 'dev'
+param environment = 'prod'
 param location = 'northeurope'
 
 // CORS origins - update with your Static Web App URL
