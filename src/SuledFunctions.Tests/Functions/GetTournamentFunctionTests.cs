@@ -10,20 +10,20 @@ using SuledFunctions.Tests.Helpers;
 
 namespace SuledFunctions.Tests.Functions;
 
-public class GetGamesForPairFunctionTests
+public class GetTournamentFunctionTests
 {
     [Fact]
     public async Task Run_DelegatesToRequestHandler()
     {
-        var handlerMock = new Mock<IGetGamesForPairRequestHandler>();
+        var handlerMock = new Mock<IGetTournamentRequestHandler>();
         var requestMock = CreateMockRequest();
         var expectedResponse = requestMock.Object.CreateResponse();
-        handlerMock.Setup(h => h.HandleAsync(requestMock.Object, "pair-1")).ReturnsAsync(expectedResponse);
+        handlerMock.Setup(h => h.HandleAsync(requestMock.Object, "t1")).ReturnsAsync(expectedResponse);
 
-        var function = new GetGamesForPairFunction(handlerMock.Object);
-        var result = await function.Run(requestMock.Object, "pair-1");
+        var function = new GetTournamentFunction(handlerMock.Object);
+        var result = await function.Run(requestMock.Object, "t1");
 
-        handlerMock.Verify(h => h.HandleAsync(requestMock.Object, "pair-1"), Times.Once);
+        handlerMock.Verify(h => h.HandleAsync(requestMock.Object, "t1"), Times.Once);
         Assert.Same(expectedResponse, result);
     }
 

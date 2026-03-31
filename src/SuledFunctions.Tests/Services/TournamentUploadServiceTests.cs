@@ -1,9 +1,13 @@
 using FluentAssertions;
+using FluentValidation;
+using FluentValidation.Results;
 using Moq;
+using SuledFunctions.Exceptions;
 using SuledFunctions.Models;
 using SuledFunctions.Models.Optimized;
 using SuledFunctions.Repositories;
 using SuledFunctions.Services;
+using SuledFunctions.Services.Excel.Interfaces;
 using SuledFunctions.Services.Interfaces;
 
 namespace SuledFunctions.Tests.Services;
@@ -12,13 +16,20 @@ public class TournamentUploadServiceTests
 {
     private readonly Mock<IExcelParserService> _excelParserMock;
     private readonly Mock<ITournamentRepository> _repositoryMock;
+    private readonly Mock<IValidator<Stream>> _fileValidatorMock;
     private readonly TournamentUploadService _service;
 
     public TournamentUploadServiceTests()
     {
         _excelParserMock = new Mock<IExcelParserService>();
         _repositoryMock = new Mock<ITournamentRepository>();
-        _service = new TournamentUploadService(_excelParserMock.Object, _repositoryMock.Object);
+        _fileValidatorMock = new Mock<IValidator<Stream>>();
+
+        _fileValidatorMock
+            .Setup(v => v.ValidateAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ValidationResult());
+
+        _service = new TournamentUploadService(_excelParserMock.Object, _repositoryMock.Object, _fileValidatorMock.Object);
 
         _repositoryMock
             .Setup(r => r.CreateAsync(It.IsAny<TournamentCompact>(), It.IsAny<CancellationToken>()))
@@ -81,6 +92,44 @@ public class TournamentUploadServiceTests
 
         using var stream = new MemoryStream();
         await Assert.ThrowsAsync<Exception>(() => _service.UploadAsync(stream, "test.xlsx"));
+    }
+
+    [Fact]
+    public async Task UploadAsync_WithInvalidStream_ThrowsValidationException()
+    {
+        _fileValidatorMock
+            .Setup(v => v.ValidateAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ValidationResult(new[]
+            {
+                new ValidationFailure(string.Empty, "File cannot be empty")
+            }));
+
+        using var stream = new MemoryStream();
+        await Assert.ThrowsAsync<SuledFunctions.Exceptions.ValidationException>(() => _service.UploadAsync(stream, "test.xlsx"));
+    }
+
+    [Fact]
+    public async Task UploadAsync_WithInvalidExtension_ThrowsValidationException()
+    {
+        using var stream = new MemoryStream(new byte[1]);
+        var ex = await Assert.ThrowsAsync<SuledFunctions.Exceptions.ValidationException>(() => _service.UploadAsync(stream, "file.csv"));
+        ex.Errors.Should().ContainKey("fileName");
+    }
+
+    [Fact]
+    public async Task UploadAsync_WithInvalidStream_DoesNotCallParser()
+    {
+        _fileValidatorMock
+            .Setup(v => v.ValidateAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ValidationResult(new[]
+            {
+                new ValidationFailure(string.Empty, "File cannot be empty")
+            }));
+
+        using var stream = new MemoryStream();
+        await Assert.ThrowsAsync<SuledFunctions.Exceptions.ValidationException>(() => _service.UploadAsync(stream, "test.xlsx"));
+
+        _excelParserMock.Verify(p => p.ParseTournamentAsync(It.IsAny<Stream>(), It.IsAny<string>()), Times.Never);
     }
 
     private static Tournament CreateTestTournament()

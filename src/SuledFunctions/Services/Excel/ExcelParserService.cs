@@ -4,7 +4,7 @@ using SuledFunctions.Models;
 using SuledFunctions.Services.Excel.Interfaces;
 using SuledFunctions.Services.Interfaces;
 
-namespace SuledFunctions.Services;
+namespace SuledFunctions.Services.Excel;
 
 /// <summary>
 /// Service for parsing tournament Excel files

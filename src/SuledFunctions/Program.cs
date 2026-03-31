@@ -8,6 +8,7 @@ using SuledFunctions.Middleware;
 using SuledFunctions.Repositories;
 using SuledFunctions.Services;
 using SuledFunctions.Services.Interfaces;
+using SuledFunctions.Services.Handlers;
 using SuledFunctions.Services.Excel;
 using SuledFunctions.Services.Excel.Interfaces;
 using OfficeOpenXml;
@@ -78,6 +79,11 @@ builder.Services.AddScoped<ITournamentService, TournamentService>();
 builder.Services.AddScoped<IRoundCalculationService, RoundCalculationService>();
 builder.Services.AddScoped<IGamesService, GamesService>();
 builder.Services.AddScoped<ITournamentUploadService, TournamentUploadService>();
+builder.Services.AddScoped<IUploadTournamentRequestHandler, UploadTournamentRequestHandler>();
+builder.Services.AddScoped<IGetTournamentsRequestHandler, GetTournamentsRequestHandler>();
+builder.Services.AddScoped<IGetTournamentRequestHandler, GetTournamentRequestHandler>();
+builder.Services.AddScoped<IGetGamesForPairRequestHandler, GetGamesForPairRequestHandler>();
+builder.Services.AddScoped<IGetPairsRequestHandler, GetPairsRequestHandler>();
 
 // Register Excel parsing components
 builder.Services.AddScoped<IExcelMetadataExtractor, ExcelMetadataExtractor>();
