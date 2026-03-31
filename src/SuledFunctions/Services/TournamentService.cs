@@ -42,38 +42,12 @@ public class TournamentService : ITournamentService
     {
         try
         {
-            var querySpec = new TournamentQuerySpec
-            {
-                StartDateFrom = startDateFrom,
-                StartDateTo = startDateTo,
-                Location = location,
-                Division = division,
-                Status = status,
-                MaxResults = maxResults > 0 ? maxResults : _settings.MaxResultsDefault
-            };
-
+            var querySpec = BuildQuerySpec(startDateFrom, startDateTo, location, division, status, maxResults);
             var compactTournaments = await _repository.QueryAsync(querySpec);
-
-            // Expand compact format to full Tournament models
-            var tournaments = compactTournaments.Select(TournamentCompactMapper.FromCompact).ToList();
-
-            // Recompute status at query time so it always reflects current reality,
-            // regardless of when the tournament was originally uploaded.
-            foreach (var t in tournaments)
-                _metadataExtractor.DetermineStatus(t);
-
-            // Apply status filter after recomputing (status stored in DB may be stale)
-            if (querySpec.Status.HasValue)
-                tournaments = tournaments.Where(t => t.Status == querySpec.Status.Value).ToList();
-
-            // Sort by StartDate in memory (descending - most recent first)
-            var sortedTournaments = tournaments
-                .OrderByDescending(t => t.StartDate ?? DateTime.MinValue)
-                .Take(querySpec.MaxResults)
-                .ToList();
-
-            _logger.LogInformation("Retrieved {Count} tournaments", sortedTournaments.Count);
-            return sortedTournaments;
+            var tournaments = ExpandAndRefreshStatus(compactTournaments);
+            var result = FilterAndSort(tournaments, querySpec);
+            _logger.LogInformation("Retrieved {Count} tournaments", result.Count);
+            return result;
         }
         catch (Exception ex)
         {
@@ -87,18 +61,10 @@ public class TournamentService : ITournamentService
         try
         {
             if (string.IsNullOrWhiteSpace(id))
-            {
                 throw new ValidationException("id", "Tournament ID cannot be empty");
-            }
 
-            var compactTournament = await _repository.GetByIdAsync(id);
-            
-            if (compactTournament == null)
-            {
-                return null;
-            }
-
-            return TournamentCompactMapper.FromCompact(compactTournament);
+            var compact = await _repository.GetByIdAsync(id);
+            return compact == null ? null : TournamentCompactMapper.FromCompact(compact);
         }
         catch (ValidationException)
         {
@@ -109,5 +75,35 @@ public class TournamentService : ITournamentService
             _logger.LogError(ex, "Error retrieving tournament {TournamentId}", id);
             throw;
         }
+    }
+
+    private TournamentQuerySpec BuildQuerySpec(DateTime? startDateFrom, DateTime? startDateTo,
+        string? location, string? division, TournamentStatus? status, int maxResults) => new()
+    {
+        StartDateFrom = startDateFrom,
+        StartDateTo = startDateTo,
+        Location = location,
+        Division = division,
+        Status = status,
+        MaxResults = maxResults > 0 ? maxResults : _settings.MaxResultsDefault
+    };
+
+    private List<Tournament> ExpandAndRefreshStatus(List<TournamentCompact> compactTournaments)
+    {
+        var tournaments = compactTournaments.Select(TournamentCompactMapper.FromCompact).ToList();
+        foreach (var t in tournaments)
+            _metadataExtractor.DetermineStatus(t);
+        return tournaments;
+    }
+
+    private static List<Tournament> FilterAndSort(List<Tournament> tournaments, TournamentQuerySpec querySpec)
+    {
+        if (querySpec.Status.HasValue)
+            tournaments = tournaments.Where(t => t.Status == querySpec.Status.Value).ToList();
+
+        return tournaments
+            .OrderByDescending(t => t.StartDate ?? DateTime.MinValue)
+            .Take(querySpec.MaxResults)
+            .ToList();
     }
 }
