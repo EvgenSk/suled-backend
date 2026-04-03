@@ -174,11 +174,8 @@ public class UploadTournamentRequestHandlerTests
             .Callback<Stream, string>((s, fn) => capturedFileName = fn)
             .ReturnsAsync(new TournamentUploadResult("id", "name", 0, 0));
 
-        var requestMock = CreateMockMultipartRequest();
-        var headers = new HttpHeadersCollection();
-        headers.Add("Content-Type", "multipart/form-data; boundary=----WebKitFormBoundary");
-        headers.Add("Content-Disposition", $"attachment; filename=\"{expectedFileName}\"");
-        requestMock.Setup(r => r.Headers).Returns(headers);
+        // Filename is in the multipart part's Content-Disposition
+        var requestMock = CreateMockMultipartRequest(partFileName: expectedFileName);
 
         await _handler.HandleAsync(requestMock.Object);
 
@@ -195,7 +192,8 @@ public class UploadTournamentRequestHandlerTests
             .Callback<Stream, string>((s, fn) => capturedFileName = fn)
             .ReturnsAsync(new TournamentUploadResult("id", "name", 0, 0));
 
-        var requestMock = CreateMockMultipartRequest();
+        // Part has no filename → falls back to request-level Content-Disposition → not present → default
+        var requestMock = CreateMockMultipartRequest(partFileName: null);
 
         await _handler.HandleAsync(requestMock.Object);
 
@@ -226,13 +224,43 @@ public class UploadTournamentRequestHandlerTests
         return requestMock;
     }
 
-    private Mock<HttpRequestData> CreateMockMultipartRequest()
+    private const string MultipartBoundary = "----WebKitFormBoundary";
+
+    private Mock<HttpRequestData> CreateMockMultipartRequest(string? partFileName = "tournament.xlsx")
     {
         var requestMock = CreateMockRequest();
         var headers = new HttpHeadersCollection();
-        headers.Add("Content-Type", "multipart/form-data; boundary=----WebKitFormBoundary");
+        headers.Add("Content-Type", $"multipart/form-data; boundary={MultipartBoundary}");
         requestMock.Setup(r => r.Headers).Returns(headers);
+        requestMock.Setup(r => r.Body).Returns(
+            BuildMultipartBody(MultipartBoundary, partFileName, Encoding.UTF8.GetBytes("test file content")));
         return requestMock;
+    }
+
+    private static MemoryStream BuildMultipartBody(string boundary, string? fileName, byte[] content)
+    {
+        var ms = new MemoryStream();
+        var crlf = "\r\n"u8.ToArray();
+
+        void WriteLine(string line)
+        {
+            var bytes = Encoding.UTF8.GetBytes(line);
+            ms.Write(bytes);
+            ms.Write(crlf);
+        }
+
+        WriteLine($"--{boundary}");
+        if (fileName != null)
+            WriteLine($"Content-Disposition: form-data; name=\"file\"; filename=\"{fileName}\"");
+        else
+            WriteLine("Content-Disposition: form-data; name=\"file\"");
+        ms.Write(crlf); // blank line between headers and body
+        ms.Write(content);
+        ms.Write(crlf);
+        WriteLine($"--{boundary}--");
+
+        ms.Position = 0;
+        return ms;
     }
 
     private static async Task<JsonDocument?> GetResponseContent(HttpResponseData response)

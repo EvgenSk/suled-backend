@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -23,20 +24,23 @@ public class UploadTournamentRequestHandler(
 
         ValidateContentType(req);
 
-        using var body = await ReadBodyAsync(req);
-        var fileName = ExtractFileName(req);
-        logger.LogInformation("Processing file: {FileName}", fileName);
+        var (body, multipartFileName) = await ReadMultipartFileAsync(req);
+        using (body)
+        {
+            var fileName = multipartFileName ?? ExtractFileName(req);
+            logger.LogInformation("Processing file: {FileName}", fileName);
 
-        try
-        {
-            var result = await uploadService.UploadAsync(body, fileName);
-            logger.LogInformation("Tournament {TournamentId} saved with {PairCount} pairs", result.Id, result.PairCount);
-            return await BuildResponseAsync(req, result);
-        }
-        catch (Exception ex) when (ex is not AppException)
-        {
-            logger.LogError(ex, "Error parsing or saving tournament");
-            throw new FileProcessingException(Constants.ErrorMessages.ProcessingError, ex, fileName);
+            try
+            {
+                var result = await uploadService.UploadAsync(body, fileName);
+                logger.LogInformation("Tournament {TournamentId} saved with {PairCount} pairs", result.Id, result.PairCount);
+                return await BuildResponseAsync(req, result);
+            }
+            catch (Exception ex) when (ex is not AppException)
+            {
+                logger.LogError(ex, "Error parsing or saving tournament");
+                throw new FileProcessingException(Constants.ErrorMessages.ProcessingError, ex, fileName);
+            }
         }
     }
 
@@ -56,13 +60,34 @@ public class UploadTournamentRequestHandler(
         }
     }
 
-    private async Task<MemoryStream> ReadBodyAsync(HttpRequestData req)
+    private async Task<(MemoryStream Content, string? FileName)> ReadMultipartFileAsync(HttpRequestData req)
     {
+        req.Headers.TryGetValues(Constants.Http.HeaderContentType, out var contentTypeValues);
+        var contentType = contentTypeValues?.FirstOrDefault() ?? string.Empty;
+        var boundary = GetMultipartBoundary(contentType);
+
         var memoryStream = new MemoryStream();
+        string? extractedFileName = null;
+
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_settings.RequestTimeoutSeconds));
         try
         {
-            await req.Body.CopyToAsync(memoryStream, cts.Token);
+            var reader = new MultipartReader(boundary, req.Body);
+            MultipartSection? section;
+            while ((section = await reader.ReadNextSectionAsync(cts.Token)) != null)
+            {
+                if (string.IsNullOrEmpty(section.ContentDisposition))
+                    continue;
+
+                var fileNameMatch = System.Text.RegularExpressions.Regex.Match(
+                    section.ContentDisposition, @"filename=""?([^"";\r\n]+)""?",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (fileNameMatch.Success)
+                    extractedFileName = fileNameMatch.Groups[1].Value.Trim();
+
+                await section.Body.CopyToAsync(memoryStream, cts.Token);
+                break; // only the first file section is used
+            }
         }
         catch (OperationCanceledException)
         {
@@ -70,9 +95,20 @@ public class UploadTournamentRequestHandler(
             throw new FileProcessingException(Constants.ErrorMessages.RequestTimeout);
         }
 
+        if (memoryStream.Length == 0)
+            throw new ValidationException("file", "No file content found in the request.");
+
         logger.LogInformation("Received {ByteCount} bytes", memoryStream.Length);
         memoryStream.Position = 0;
-        return memoryStream;
+        return (memoryStream, extractedFileName);
+    }
+
+    private static string GetMultipartBoundary(string contentType)
+    {
+        var elements = contentType.Split(';');
+        var boundaryElement = elements
+            .FirstOrDefault(e => e.TrimStart().StartsWith("boundary=", StringComparison.OrdinalIgnoreCase));
+        return boundaryElement?.Trim()["boundary=".Length..].Trim('"') ?? string.Empty;
     }
 
     private static async Task<HttpResponseData> BuildResponseAsync(HttpRequestData req, TournamentUploadResult result)
