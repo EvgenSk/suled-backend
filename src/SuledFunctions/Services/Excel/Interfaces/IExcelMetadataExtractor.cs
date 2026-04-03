@@ -1,10 +1,9 @@
-using OfficeOpenXml;
 using SuledFunctions.Models;
 
 namespace SuledFunctions.Services.Excel.Interfaces;
 
 /// <summary>
-/// Interface for extracting tournament metadata from filename and Excel cells
+/// Interface for extracting tournament metadata from filename and cell rows
 /// </summary>
 public interface IExcelMetadataExtractor
 {
@@ -14,9 +13,9 @@ public interface IExcelMetadataExtractor
     void ExtractFromFileName(Tournament tournament, string fileName);
 
     /// <summary>
-    /// Extract metadata from Excel worksheet cells
+    /// Extract metadata from rows of cell values (0-indexed)
     /// </summary>
-    void ExtractFromExcel(Tournament tournament, ExcelWorksheet worksheet);
+    void ExtractFromExcel(Tournament tournament, string[][] rows);
 
     /// <summary>
     /// Determine tournament status based on dates

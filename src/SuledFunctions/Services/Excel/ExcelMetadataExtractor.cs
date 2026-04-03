@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using OfficeOpenXml;
 using SuledFunctions.Models;
 using SuledFunctions.Services.Excel.Interfaces;
 using System.Globalization;
@@ -9,14 +8,8 @@ namespace SuledFunctions.Services.Excel;
 /// <summary>
 /// Extracts tournament metadata from filename and Excel cells
 /// </summary>
-public class ExcelMetadataExtractor : IExcelMetadataExtractor
+public class ExcelMetadataExtractor(ILogger<ExcelMetadataExtractor> logger) : IExcelMetadataExtractor
 {
-    private readonly ILogger<ExcelMetadataExtractor> _logger;
-
-    public ExcelMetadataExtractor(ILogger<ExcelMetadataExtractor> logger)
-    {
-        _logger = logger;
-    }
 
     /// <summary>
     /// Extract metadata from filename pattern: tournament_2025-11-15_Chicago_DivisionA.xlsx
@@ -30,59 +23,58 @@ public class ExcelMetadataExtractor : IExcelMetadataExtractor
             
             // Expected format: name_date_location_division
             // e.g., "SummerChampionship_2025-11-15_Chicago_DivisionA"
-            if (parts.Length >= 2)
+            if (parts.Length < 2) return;
+            
+            // First part is tournament name
+            tournament.Name = parts[0];
+                
+            // Try to parse date from second part
+            if (DateTime.TryParseExact(parts[1], "dd'-'MM'-'yyyy",
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.None,
+                    out var startDate))
             {
-                // First part is tournament name
-                tournament.Name = parts[0];
+                tournament.StartDate = startDate;
+            }
                 
-                // Try to parse date from second part
-                if (DateTime.TryParseExact(parts[1], "dd'-'MM'-'yyyy",
-                           CultureInfo.InvariantCulture,
-                           DateTimeStyles.None,
-                           out var startDate))
-                {
-                    tournament.StartDate = startDate;
-                }
+            // Third part is location (if exists)
+            if (parts.Length >= 3)
+            {
+                tournament.Location = parts[2];
+            }
                 
-                // Third part is location (if exists)
-                if (parts.Length >= 3)
-                {
-                    tournament.Location = parts[2];
-                }
-                
-                // Fourth part is division (if exists)
-                if (parts.Length >= 4)
-                {
-                    tournament.Division = parts[3];
-                }
+            // Fourth part is division (if exists)
+            if (parts.Length >= 4)
+            {
+                tournament.Division = parts[3];
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Could not extract metadata from filename {FileName}", fileName);
+            logger.LogWarning(ex, "Could not extract metadata from filename {FileName}", fileName);
         }
     }
     
     /// <summary>
-    /// Try to extract metadata from Excel cells
-    /// Expected format (optional):
-    /// Row 1: Tournament Name: [value]
-    /// Row 2: Location: [value]
-    /// Row 3: Date: [value]
-    /// Row 4: Division: [value]
-    /// Row 5: Start Time: [value]
-    /// Row 6: End Time: [value]
-    /// Row 7: Rules: [value]
+    /// Try to extract metadata from rows of cell values.
+    /// Expected optional metadata in columns J and K (0-based indices 9 and 10):
+    /// Row 0: Tournament Name: [value]
+    /// Row 1: Location: [value]
+    /// Row 2: Date: [value]
+    /// Row 3: Division: [value]
+    /// Row 4: Start Time: [value]
+    /// Row 5: End Time: [value]
+    /// Row 6: Rules: [value]
     /// </summary>
-    public void ExtractFromExcel(Tournament tournament, ExcelWorksheet worksheet)
+    public void ExtractFromExcel(Tournament tournament, string[][] rows)
     {
         try
         {
-            // Look for metadata in first few rows (increased to 10 to accommodate more fields)
-            for (int row = 1; row <= Math.Min(10, worksheet.Dimension?.End.Row ?? 0); row++)
+            // Look for metadata in first few rows
+            for (int row = 0; row < Math.Min(10, rows.Length); row++)
             {
-                var labelCell = worksheet.Cells[row, 10].Text.Trim();
-                var valueCell = worksheet.Cells[row, 11].Text.Trim();
+                var labelCell = GetCell(rows, row, 9).Trim();
+                var valueCell = GetCell(rows, row, 10).Trim();
                 
                 if (string.IsNullOrWhiteSpace(labelCell)) continue;
                 
@@ -91,8 +83,16 @@ public class ExcelMetadataExtractor : IExcelMetadataExtractor
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Could not extract metadata from Excel content");
+            logger.LogWarning(ex, "Could not extract metadata from Excel content");
         }
+    }
+
+    private static string GetCell(string[][] rows, int rowIdx, int colIdx)
+    {
+        if (rowIdx >= rows.Length) return string.Empty;
+        var row = rows[rowIdx];
+        if (colIdx >= row.Length) return string.Empty;
+        return row[colIdx] ?? string.Empty;
     }
 
     private void ExtractMetadataField(Tournament tournament, string label, string value)

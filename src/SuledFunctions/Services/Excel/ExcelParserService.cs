@@ -1,5 +1,5 @@
+using ExcelDataReader;
 using Microsoft.Extensions.Logging;
-using OfficeOpenXml;
 using SuledFunctions.Models;
 using SuledFunctions.Services.Excel.Interfaces;
 using SuledFunctions.Services.Interfaces;
@@ -7,35 +7,27 @@ using SuledFunctions.Services.Interfaces;
 namespace SuledFunctions.Services.Excel;
 
 /// <summary>
-/// Service for parsing tournament Excel files
-/// Expected format: Each row contains court number and pairs playing
+/// Service for parsing tournament Excel files.
+/// Reads the xlsx stream into rows of cell strings, then delegates to
+/// ExcelMetadataExtractor and ExcelGameParser which work on plain string[][].
 /// </summary>
-public class ExcelParserService : IExcelParserService
+public class ExcelParserService(
+    IExcelMetadataExtractor metadataExtractor,
+    IExcelGameParser gameParser,
+    IPairStructureConverter pairConverter,
+    IRoundCalculationService roundCalculationService,
+    ILogger<ExcelParserService> logger) : IExcelParserService
 {
-    private readonly IExcelMetadataExtractor _metadataExtractor;
-    private readonly IExcelGameParser _gameParser;
-    private readonly IPairStructureConverter _pairConverter;
-    private readonly IRoundCalculationService _roundCalculationService;
-    private readonly ILogger<ExcelParserService> _logger;
-
-    public ExcelParserService(
-        IExcelMetadataExtractor metadataExtractor,
-        IExcelGameParser gameParser,
-        IPairStructureConverter pairConverter,
-        IRoundCalculationService roundCalculationService,
-        ILogger<ExcelParserService> logger)
+    static ExcelParserService()
     {
-        _metadataExtractor = metadataExtractor;
-        _gameParser = gameParser;
-        _pairConverter = pairConverter;
-        _roundCalculationService = roundCalculationService;
-        _logger = logger;
+        // Required by ExcelDataReader on .NET Core for non-UTF encodings
+        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
     }
 
     /// <summary>
-    /// Parse tournament data from Excel stream
+    /// Parse tournament data from an Excel (.xlsx / .xls) stream
     /// </summary>
-    public async Task<Tournament> ParseTournamentAsync(Stream excelStream, string fileName)
+    public Task<Tournament> ParseTournamentAsync(Stream excelStream, string fileName)
     {
         try
         {
@@ -44,42 +36,64 @@ public class ExcelParserService : IExcelParserService
                 Name = Path.GetFileNameWithoutExtension(fileName),
                 BlobFileName = fileName
             };
-            
-            using var package = new ExcelPackage(excelStream);
-            var worksheet = package.Workbook.Worksheets[0]; // Get first worksheet
-            
-            if (worksheet == null)
+
+            var rows = ReadFirstSheetRows(excelStream);
+
+            if (rows.Length == 0)
             {
-                throw new InvalidOperationException("No worksheet found in Excel file");
+                return Task.FromResult(tournament);
             }
 
             // Extract metadata from filename
-            _metadataExtractor.ExtractFromFileName(tournament, fileName);
-            
-            // Try to extract metadata from Excel (optional)
-            _metadataExtractor.ExtractFromExcel(tournament, worksheet);
+            metadataExtractor.ExtractFromFileName(tournament, fileName);
 
-            var games = _gameParser.ParseGames(worksheet, tournament.Id);
-            
+            // Try to extract metadata from cell content (optional)
+            metadataExtractor.ExtractFromExcel(tournament, rows);
+
+            var games = gameParser.ParseGames(rows, tournament.Id);
+
             // Convert game-centered data to pair-centered structure
-            tournament.Pairs = _pairConverter.ConvertGamesToPairCentricStructure(games, tournament.Id);
-            
+            tournament.Pairs = pairConverter.ConvertGamesToPairCentricStructure(games, tournament.Id);
+
             // Calculate round schedules based on tournament metadata and games
-            tournament.Rounds = _roundCalculationService.CalculateRounds(tournament);
-            
+            tournament.Rounds = roundCalculationService.CalculateRounds(tournament);
+
             // Auto-determine tournament status based on dates
-            _metadataExtractor.DetermineStatus(tournament);
+            metadataExtractor.DetermineStatus(tournament);
 
             var totalGames = tournament.Pairs.Sum(p => p.Games.Count);
-            _logger.LogInformation("Parsed {PairCount} pairs with {GameCount} total games and {RoundCount} rounds from tournament {TournamentName}", 
+            logger.LogInformation(
+                "Parsed {PairCount} pairs with {GameCount} total games and {RoundCount} rounds from tournament {TournamentName}",
                 tournament.Pairs.Count, totalGames, tournament.Rounds.Count, tournament.Name);
 
-            return tournament;
+            return Task.FromResult(tournament);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error parsing Excel file {FileName}", fileName);
+            logger.LogError(ex, "Error parsing Excel file {FileName}", fileName);
             throw;
         }
+    }
+
+    /// <summary>
+    /// Reads the first worksheet of an Excel file into a jagged string array.
+    /// rows[rowIndex][columnIndex] — both indices are 0-based.
+    /// </summary>
+    private static string[][] ReadFirstSheetRows(Stream excelStream)
+    {
+        using var reader = ExcelReaderFactory.CreateReader(excelStream);
+        var rows = new List<string[]>();
+
+        while (reader.Read())
+        {
+            var row = new string[reader.FieldCount];
+            for (int i = 0; i < reader.FieldCount; i++)
+            {
+                row[i] = reader.GetValue(i)?.ToString() ?? string.Empty;
+            }
+            rows.Add(row);
+        }
+
+        return rows.ToArray();
     }
 }

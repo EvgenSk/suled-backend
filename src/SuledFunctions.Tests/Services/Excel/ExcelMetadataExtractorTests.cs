@@ -1,27 +1,20 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
-using OfficeOpenXml;
 using SuledFunctions.Models;
 using SuledFunctions.Services.Excel;
 
 namespace SuledFunctions.Tests.Services.Excel;
 
-public class ExcelMetadataExtractorTests : IDisposable
+public class ExcelMetadataExtractorTests
 {
     private readonly Mock<ILogger<ExcelMetadataExtractor>> _loggerMock;
     private readonly ExcelMetadataExtractor _extractor;
 
     public ExcelMetadataExtractorTests()
     {
-        ExcelPackage.License.SetNonCommercialPersonal("Test");
         _loggerMock = new Mock<ILogger<ExcelMetadataExtractor>>();
         _extractor = new ExcelMetadataExtractor(_loggerMock.Object);
-    }
-
-    public void Dispose()
-    {
-        // Cleanup if needed
     }
 
     [Fact]
@@ -95,28 +88,20 @@ public class ExcelMetadataExtractorTests : IDisposable
     {
         // Arrange
         var tournament = new Tournament();
-        using var package = new ExcelPackage();
-        var worksheet = package.Workbook.Worksheets.Add("Test");
-
-        worksheet.Cells[1, 10].Value = "Tournament Name:";
-        worksheet.Cells[1, 11].Value = "Excel Tournament";
-        worksheet.Cells[2, 10].Value = "Location:";
-        worksheet.Cells[2, 11].Value = "New York";
-        worksheet.Cells[3, 10].Value = "Date:";
-        worksheet.Cells[3, 11].Value = "22.11.2025";
-        worksheet.Cells[4, 10].Value = "Division:";
-        worksheet.Cells[4, 11].Value = "Pro";
-        worksheet.Cells[5, 10].Value = "Start Time:";
-        worksheet.Cells[5, 11].Value = "09:00";
-        worksheet.Cells[6, 10].Value = "End Time:";
-        worksheet.Cells[6, 11].Value = "17:00";
-        worksheet.Cells[7, 10].Value = "Description:";
-        worksheet.Cells[7, 11].Value = "Annual championship";
-        worksheet.Cells[8, 10].Value = "Rules:";
-        worksheet.Cells[8, 11].Value = "Standard rules apply";
+        // Metadata is in 0-based columns 9 (label) and 10 (value)
+        var rows = CreateMetadataRows(
+            ("Tournament Name:", "Excel Tournament"),
+            ("Location:", "New York"),
+            ("Date:", "22.11.2025"),
+            ("Division:", "Pro"),
+            ("Start Time:", "09:00"),
+            ("End Time:", "17:00"),
+            ("Description:", "Annual championship"),
+            ("Rules:", "Standard rules apply")
+        );
 
         // Act
-        _extractor.ExtractFromExcel(tournament, worksheet);
+        _extractor.ExtractFromExcel(tournament, rows);
 
         // Assert
         tournament.Name.Should().Be("Excel Tournament");
@@ -134,14 +119,10 @@ public class ExcelMetadataExtractorTests : IDisposable
     {
         // Arrange
         var tournament = new Tournament { Name = "Original Name" };
-        using var package = new ExcelPackage();
-        var worksheet = package.Workbook.Worksheets.Add("Test");
-
-        worksheet.Cells[1, 10].Value = "Location:";
-        worksheet.Cells[1, 11].Value = "Boston";
+        var rows = CreateMetadataRows(("Location:", "Boston"));
 
         // Act
-        _extractor.ExtractFromExcel(tournament, worksheet);
+        _extractor.ExtractFromExcel(tournament, rows);
 
         // Assert
         tournament.Location.Should().Be("Boston");
@@ -153,11 +134,10 @@ public class ExcelMetadataExtractorTests : IDisposable
     {
         // Arrange
         var tournament = new Tournament { Name = "Test" };
-        using var package = new ExcelPackage();
-        var worksheet = package.Workbook.Worksheets.Add("Test");
+        var rows = Array.Empty<string[]>();
 
         // Act
-        var action = () => _extractor.ExtractFromExcel(tournament, worksheet);
+        var action = () => _extractor.ExtractFromExcel(tournament, rows);
 
         // Assert
         action.Should().NotThrow();
@@ -169,16 +149,13 @@ public class ExcelMetadataExtractorTests : IDisposable
     {
         // Arrange
         var tournament = new Tournament();
-        using var package = new ExcelPackage();
-        var worksheet = package.Workbook.Worksheets.Add("Test");
-
-        worksheet.Cells[1, 10].Value = "LOCATION:"; // Uppercase
-        worksheet.Cells[1, 11].Value = "Seattle";
-        worksheet.Cells[2, 10].Value = "category:"; // Lowercase (synonym for division)
-        worksheet.Cells[2, 11].Value = "Advanced";
+        var rows = CreateMetadataRows(
+            ("LOCATION:", "Seattle"),        // Uppercase
+            ("category:", "Advanced")        // Lowercase synonym for division
+        );
 
         // Act
-        _extractor.ExtractFromExcel(tournament, worksheet);
+        _extractor.ExtractFromExcel(tournament, rows);
 
         // Assert
         tournament.Location.Should().Be("Seattle");
@@ -266,5 +243,19 @@ public class ExcelMetadataExtractorTests : IDisposable
 
         // Assert
         tournament.Status.Should().Be(TournamentStatus.Completed);
+    }
+
+    /// <summary>
+    /// Creates a string[][] where metadata labels are in column index 9 and values in column index 10.
+    /// </summary>
+    private static string[][] CreateMetadataRows(params (string label, string value)[] entries)
+    {
+        return entries.Select(e =>
+        {
+            var row = new string[11];
+            row[9] = e.label;
+            row[10] = e.value;
+            return row;
+        }).ToArray();
     }
 }

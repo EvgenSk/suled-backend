@@ -1,15 +1,14 @@
-using OfficeOpenXml;
 using SuledFunctions.Models;
 
 namespace SuledFunctions.Services.Excel.Interfaces;
 
 /// <summary>
-/// Interface for parsing game data from Excel worksheets
+/// Interface for parsing game data from rows of cell values
 /// </summary>
 public interface IExcelGameParser
 {
     /// <summary>
-    /// Parse all games from the worksheet
+    /// Parse all games from rows (0-indexed: rows[rowIndex][columnIndex])
     /// </summary>
-    List<Game> ParseGames(ExcelWorksheet worksheet, string tournamentId);
+    List<Game> ParseGames(string[][] rows, string tournamentId);
 }

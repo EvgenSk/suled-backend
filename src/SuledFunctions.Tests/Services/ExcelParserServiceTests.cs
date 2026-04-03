@@ -1,7 +1,7 @@
+using ClosedXML.Excel;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
-using OfficeOpenXml;
 using SuledFunctions.Models;
 using SuledFunctions.Services;
 using SuledFunctions.Services.Excel;
@@ -19,9 +19,6 @@ public class ExcelParserServiceTests : IDisposable
 
     public ExcelParserServiceTests()
     {
-        // Configure EPPlus license for tests
-        ExcelPackage.License.SetNonCommercialPersonal("Test");
-        
         _loggerMock = new Mock<ILogger<ExcelParserService>>();
         _metadataLoggerMock = new Mock<ILogger<ExcelMetadataExtractor>>();
         _gameParserLoggerMock = new Mock<ILogger<ExcelGameParser>>();
@@ -68,10 +65,10 @@ public class ExcelParserServiceTests : IDisposable
     public async Task ParseTournamentAsync_WithEmptyWorksheet_ReturnsEmptyTournament()
     {
         // Arrange
-        using var package = new ExcelPackage();
-        var worksheet = package.Workbook.Worksheets.Add("Empty");
+        using var workbook = new XLWorkbook();
+        workbook.Worksheets.Add("Empty");
         using var stream = new MemoryStream();
-        package.SaveAs(stream);
+        workbook.SaveAs(stream);
         stream.Position = 0;
 
         // Act
@@ -292,23 +289,21 @@ public class ExcelParserServiceTests : IDisposable
     public async Task ParseTournamentAsync_HandlesExtraWhitespace()
     {
         // Arrange
-        using var package = new ExcelPackage();
-        var worksheet = package.Workbook.Worksheets.Add("Test");
-        
-        // Add header
-        worksheet.Cells[1, 1].Value = "Round";
-        worksheet.Cells[1, 2].Value = "Court";
-        
-        // Add game with extra whitespace
-        worksheet.Cells[2, 1].Value = "  Round   1  ";
-        worksheet.Cells[2, 2].Value = " 1 ";
-        worksheet.Cells[2, 3].Value = "  John   Doe  ";
-        worksheet.Cells[2, 4].Value = "  Jane   Smith  ";
-        worksheet.Cells[2, 7].Value = "  Alice   Brown  ";
-        worksheet.Cells[2, 8].Value = "  Bob   White  ";
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("Test");
+
+        ws.Cell(1, 1).Value = "Round";
+        ws.Cell(1, 2).Value = "Court";
+
+        ws.Cell(2, 1).Value = "  Round   1  ";
+        ws.Cell(2, 2).Value = " 1 ";
+        ws.Cell(2, 3).Value = "  John   Doe  ";
+        ws.Cell(2, 4).Value = "  Jane   Smith  ";
+        ws.Cell(2, 7).Value = "  Alice   Brown  ";
+        ws.Cell(2, 8).Value = "  Bob   White  ";
 
         using var stream = new MemoryStream();
-        package.SaveAs(stream);
+        workbook.SaveAs(stream);
         stream.Position = 0;
 
         // Act
@@ -326,38 +321,36 @@ public class ExcelParserServiceTests : IDisposable
         pair.PairInfo.Player2.Surname.Should().Be("Smith");
     }
 
-    private MemoryStream CreateTestExcelStream(params (string round, int court, string p1_1, string p1_2, string p2_1, string p2_2)[] games)
+    private static MemoryStream CreateTestExcelStream(params (string round, int court, string p1_1, string p1_2, string p2_1, string p2_2)[] games)
     {
-        using var package = new ExcelPackage();
-        var worksheet = package.Workbook.Worksheets.Add("Test");
-        
-        // Add header row
-        worksheet.Cells[1, 1].Value = "Round";
-        worksheet.Cells[1, 2].Value = "Court";
-        worksheet.Cells[1, 3].Value = "Player 1.1";
-        worksheet.Cells[1, 4].Value = "Player 1.2";
-        worksheet.Cells[1, 7].Value = "Player 2.1";
-        worksheet.Cells[1, 8].Value = "Player 2.2";
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("Test");
 
-        // Add game data
+        ws.Cell(1, 1).Value = "Round";
+        ws.Cell(1, 2).Value = "Court";
+        ws.Cell(1, 3).Value = "Player 1.1";
+        ws.Cell(1, 4).Value = "Player 1.2";
+        ws.Cell(1, 7).Value = "Player 2.1";
+        ws.Cell(1, 8).Value = "Player 2.2";
+
         for (int i = 0; i < games.Length; i++)
         {
             int row = i + 2;
             var game = games[i];
-            
+
             if (!string.IsNullOrEmpty(game.round))
-                worksheet.Cells[row, 1].Value = game.round;
+                ws.Cell(row, 1).Value = game.round;
             if (game.court > 0)
-                worksheet.Cells[row, 2].Value = game.court;
-            
-            worksheet.Cells[row, 3].Value = game.p1_1;
-            worksheet.Cells[row, 4].Value = game.p1_2;
-            worksheet.Cells[row, 7].Value = game.p2_1;
-            worksheet.Cells[row, 8].Value = game.p2_2;
+                ws.Cell(row, 2).Value = game.court;
+
+            ws.Cell(row, 3).Value = game.p1_1;
+            ws.Cell(row, 4).Value = game.p1_2;
+            ws.Cell(row, 7).Value = game.p2_1;
+            ws.Cell(row, 8).Value = game.p2_2;
         }
 
         var stream = new MemoryStream();
-        package.SaveAs(stream);
+        workbook.SaveAs(stream);
         stream.Position = 0;
         return stream;
     }
@@ -411,54 +404,51 @@ public class ExcelParserServiceTests : IDisposable
         result.Rounds[1].RoundNumber.Should().Be(2);
     }
 
-    private MemoryStream CreateTestExcelStreamWithMetadata(
+    private static MemoryStream CreateTestExcelStreamWithMetadata(
         string startDate,
         string startTime,
         string endTime,
         params (string round, int court, string p1_1, string p1_2, string p2_1, string p2_2)[] games)
     {
-        var package = new ExcelPackage();
-        var worksheet = package.Workbook.Worksheets.Add("Tournament");
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("Tournament");
 
-        // Add metadata in columns J and K (10 and 11)
-        worksheet.Cells[1, 10].Value = "Tournament Name:";
-        worksheet.Cells[1, 11].Value = "Test Tournament";
-        worksheet.Cells[2, 10].Value = "Date:";
-        worksheet.Cells[2, 11].Value = startDate;
-        worksheet.Cells[3, 10].Value = "Start Time:";
-        worksheet.Cells[3, 11].Value = startTime;
-        worksheet.Cells[4, 10].Value = "End Time:";
-        worksheet.Cells[4, 11].Value = endTime;
-        worksheet.Cells[5, 10].Value = "Location:";
-        worksheet.Cells[5, 11].Value = "Test Location";
+        ws.Cell(1, 10).Value = "Tournament Name:";
+        ws.Cell(1, 11).Value = "Test Tournament";
+        ws.Cell(2, 10).Value = "Date:";
+        ws.Cell(2, 11).Value = startDate;
+        ws.Cell(3, 10).Value = "Start Time:";
+        ws.Cell(3, 11).Value = startTime;
+        ws.Cell(4, 10).Value = "End Time:";
+        ws.Cell(4, 11).Value = endTime;
+        ws.Cell(5, 10).Value = "Location:";
+        ws.Cell(5, 11).Value = "Test Location";
 
-        // Add headers for game data
-        worksheet.Cells[1, 1].Value = "Round";
-        worksheet.Cells[1, 2].Value = "Court";
-        worksheet.Cells[1, 3].Value = "Player 1.1";
-        worksheet.Cells[1, 4].Value = "Player 1.2";
-        worksheet.Cells[1, 7].Value = "Player 2.1";
-        worksheet.Cells[1, 8].Value = "Player 2.2";
+        ws.Cell(1, 1).Value = "Round";
+        ws.Cell(1, 2).Value = "Court";
+        ws.Cell(1, 3).Value = "Player 1.1";
+        ws.Cell(1, 4).Value = "Player 1.2";
+        ws.Cell(1, 7).Value = "Player 2.1";
+        ws.Cell(1, 8).Value = "Player 2.2";
 
-        // Add game data
         for (int i = 0; i < games.Length; i++)
         {
             int row = i + 2;
             var game = games[i];
-            
+
             if (!string.IsNullOrEmpty(game.round))
-                worksheet.Cells[row, 1].Value = game.round;
+                ws.Cell(row, 1).Value = game.round;
             if (game.court > 0)
-                worksheet.Cells[row, 2].Value = game.court;
-            
-            worksheet.Cells[row, 3].Value = game.p1_1;
-            worksheet.Cells[row, 4].Value = game.p1_2;
-            worksheet.Cells[row, 7].Value = game.p2_1;
-            worksheet.Cells[row, 8].Value = game.p2_2;
+                ws.Cell(row, 2).Value = game.court;
+
+            ws.Cell(row, 3).Value = game.p1_1;
+            ws.Cell(row, 4).Value = game.p1_2;
+            ws.Cell(row, 7).Value = game.p2_1;
+            ws.Cell(row, 8).Value = game.p2_2;
         }
 
         var stream = new MemoryStream();
-        package.SaveAs(stream);
+        workbook.SaveAs(stream);
         stream.Position = 0;
         return stream;
     }

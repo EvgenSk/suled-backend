@@ -11,17 +11,12 @@ using SuledFunctions.Services.Interfaces;
 using SuledFunctions.Services.Handlers;
 using SuledFunctions.Services.Excel;
 using SuledFunctions.Services.Excel.Interfaces;
-using OfficeOpenXml;
 using Microsoft.Azure.Cosmos;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FluentValidation;
 
 var builder = FunctionsApplication.CreateBuilder(args);
-
-// Configure EPPlus license (EPPlus 8+)
-// This must be set before any ExcelPackage instance is created
-ExcelPackage.License.SetNonCommercialPersonal("EvgenSk"); // TODO: do it in some proper way
 
 builder.ConfigureFunctionsWebApplication();
 

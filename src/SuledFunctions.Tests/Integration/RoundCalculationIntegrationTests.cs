@@ -1,7 +1,7 @@
+using ClosedXML.Excel;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
-using OfficeOpenXml;
 using SuledFunctions.Models;
 using SuledFunctions.Services;
 using SuledFunctions.Services.Excel;
@@ -11,19 +11,8 @@ namespace SuledFunctions.Tests.Integration;
 /// <summary>
 /// Integration tests for round calculation feature end-to-end
 /// </summary>
-public class RoundCalculationIntegrationTests : IDisposable
+public class RoundCalculationIntegrationTests
 {
-    public RoundCalculationIntegrationTests()
-    {
-        // Configure EPPlus license for tests
-        ExcelPackage.License.SetNonCommercialPersonal("Test");
-    }
-
-    public void Dispose()
-    {
-        // Cleanup if needed
-    }
-
     [Fact]
     public async Task TournamentWorkflow_ParsesExcelAndCalculatesRounds()
     {
@@ -173,32 +162,32 @@ public class RoundCalculationIntegrationTests : IDisposable
 
     private MemoryStream CreateCompleteTestExcel()
     {
-        var package = new ExcelPackage();
-        var worksheet = package.Workbook.Worksheets.Add("Tournament");
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("Tournament");
 
-        // Add metadata
-        worksheet.Cells[1, 10].Value = "Tournament Name:";
-        worksheet.Cells[1, 11].Value = "Test Tournament";
-        worksheet.Cells[2, 10].Value = "Date:";
-        worksheet.Cells[2, 11].Value = "22.11.2025";
-        worksheet.Cells[3, 10].Value = "Start Time:";
-        worksheet.Cells[3, 11].Value = "09:00";
-        worksheet.Cells[4, 10].Value = "End Time:";
-        worksheet.Cells[4, 11].Value = "17:00";
-        worksheet.Cells[5, 10].Value = "Location:";
-        worksheet.Cells[5, 11].Value = "Test Arena";
-        worksheet.Cells[6, 10].Value = "Division:";
-        worksheet.Cells[6, 11].Value = "Division A";
+        // Metadata
+        ws.Cell(1, 10).Value = "Tournament Name:";
+        ws.Cell(1, 11).Value = "Test Tournament";
+        ws.Cell(2, 10).Value = "Date:";
+        ws.Cell(2, 11).Value = "22.11.2025";
+        ws.Cell(3, 10).Value = "Start Time:";
+        ws.Cell(3, 11).Value = "09:00";
+        ws.Cell(4, 10).Value = "End Time:";
+        ws.Cell(4, 11).Value = "17:00";
+        ws.Cell(5, 10).Value = "Location:";
+        ws.Cell(5, 11).Value = "Test Arena";
+        ws.Cell(6, 10).Value = "Division:";
+        ws.Cell(6, 11).Value = "Division A";
 
-        // Add headers
-        worksheet.Cells[1, 1].Value = "Round";
-        worksheet.Cells[1, 2].Value = "Court";
-        worksheet.Cells[1, 3].Value = "Player 1.1";
-        worksheet.Cells[1, 4].Value = "Player 1.2";
-        worksheet.Cells[1, 7].Value = "Player 2.1";
-        worksheet.Cells[1, 8].Value = "Player 2.2";
+        // Headers
+        ws.Cell(1, 1).Value = "Round";
+        ws.Cell(1, 2).Value = "Court";
+        ws.Cell(1, 3).Value = "Player 1.1";
+        ws.Cell(1, 4).Value = "Player 1.2";
+        ws.Cell(1, 7).Value = "Player 2.1";
+        ws.Cell(1, 8).Value = "Player 2.2";
 
-        // Add games for 2 rounds
+        // Games for 2 rounds
         var games = new[]
         {
             ("Round 1", 1, "Alice", "Anderson", "Bob", "Brown"),
@@ -211,43 +200,43 @@ public class RoundCalculationIntegrationTests : IDisposable
         {
             int row = i + 2;
             var game = games[i];
-            worksheet.Cells[row, 1].Value = game.Item1;
-            worksheet.Cells[row, 2].Value = game.Item2;
-            worksheet.Cells[row, 3].Value = game.Item3;
-            worksheet.Cells[row, 4].Value = game.Item4;
-            worksheet.Cells[row, 7].Value = game.Item5;
-            worksheet.Cells[row, 8].Value = game.Item6;
+            ws.Cell(row, 1).Value = game.Item1;
+            ws.Cell(row, 2).Value = game.Item2;
+            ws.Cell(row, 3).Value = game.Item3;
+            ws.Cell(row, 4).Value = game.Item4;
+            ws.Cell(row, 7).Value = game.Item5;
+            ws.Cell(row, 8).Value = game.Item6;
         }
 
         var stream = new MemoryStream();
-        package.SaveAs(stream);
+        workbook.SaveAs(stream);
         stream.Position = 0;
         return stream;
     }
 
     private MemoryStream CreateMultiRoundExcel(int rounds, int gamesPerRound, int courts, string? endTime = null)
     {
-        var package = new ExcelPackage();
-        var worksheet = package.Workbook.Worksheets.Add("Tournament");
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("Tournament");
 
-        // Add metadata
-        worksheet.Cells[1, 10].Value = "Date:";
-        worksheet.Cells[1, 11].Value = "22.11.2025";
-        worksheet.Cells[2, 10].Value = "Start Time:";
-        worksheet.Cells[2, 11].Value = "09:00";
+        // Metadata
+        ws.Cell(1, 10).Value = "Date:";
+        ws.Cell(1, 11).Value = "22.11.2025";
+        ws.Cell(2, 10).Value = "Start Time:";
+        ws.Cell(2, 11).Value = "09:00";
         if (endTime != null)
         {
-            worksheet.Cells[3, 10].Value = "End Time:";
-            worksheet.Cells[3, 11].Value = endTime;
+            ws.Cell(3, 10).Value = "End Time:";
+            ws.Cell(3, 11).Value = endTime;
         }
 
-        // Add headers
-        worksheet.Cells[1, 1].Value = "Round";
-        worksheet.Cells[1, 2].Value = "Court";
-        worksheet.Cells[1, 3].Value = "Player 1.1";
-        worksheet.Cells[1, 4].Value = "Player 1.2";
-        worksheet.Cells[1, 7].Value = "Player 2.1";
-        worksheet.Cells[1, 8].Value = "Player 2.2";
+        // Headers
+        ws.Cell(1, 1).Value = "Round";
+        ws.Cell(1, 2).Value = "Court";
+        ws.Cell(1, 3).Value = "Player 1.1";
+        ws.Cell(1, 4).Value = "Player 1.2";
+        ws.Cell(1, 7).Value = "Player 2.1";
+        ws.Cell(1, 8).Value = "Player 2.2";
 
         int rowIndex = 2;
         int playerIndex = 1;
@@ -257,46 +246,46 @@ public class RoundCalculationIntegrationTests : IDisposable
             for (int game = 0; game < gamesPerRound; game++)
             {
                 var court = (game % courts) + 1;
-                worksheet.Cells[rowIndex, 1].Value = $"Round {round}";
-                worksheet.Cells[rowIndex, 2].Value = court;
-                worksheet.Cells[rowIndex, 3].Value = $"P{playerIndex}A";
-                worksheet.Cells[rowIndex, 4].Value = $"P{playerIndex}B";
-                worksheet.Cells[rowIndex, 7].Value = $"P{playerIndex + 1}A";
-                worksheet.Cells[rowIndex, 8].Value = $"P{playerIndex + 1}B";
+                ws.Cell(rowIndex, 1).Value = $"Round {round}";
+                ws.Cell(rowIndex, 2).Value = court;
+                ws.Cell(rowIndex, 3).Value = $"P{playerIndex}A";
+                ws.Cell(rowIndex, 4).Value = $"P{playerIndex}B";
+                ws.Cell(rowIndex, 7).Value = $"P{playerIndex + 1}A";
+                ws.Cell(rowIndex, 8).Value = $"P{playerIndex + 1}B";
                 rowIndex++;
                 playerIndex += 2;
             }
         }
 
         var stream = new MemoryStream();
-        package.SaveAs(stream);
+        workbook.SaveAs(stream);
         stream.Position = 0;
         return stream;
     }
 
     private MemoryStream CreateMinimalExcel()
     {
-        var package = new ExcelPackage();
-        var worksheet = package.Workbook.Worksheets.Add("Tournament");
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("Tournament");
 
-        // Headers only
-        worksheet.Cells[1, 1].Value = "Round";
-        worksheet.Cells[1, 2].Value = "Court";
-        worksheet.Cells[1, 3].Value = "Player 1.1";
-        worksheet.Cells[1, 4].Value = "Player 1.2";
-        worksheet.Cells[1, 7].Value = "Player 2.1";
-        worksheet.Cells[1, 8].Value = "Player 2.2";
+        // Headers
+        ws.Cell(1, 1).Value = "Round";
+        ws.Cell(1, 2).Value = "Court";
+        ws.Cell(1, 3).Value = "Player 1.1";
+        ws.Cell(1, 4).Value = "Player 1.2";
+        ws.Cell(1, 7).Value = "Player 2.1";
+        ws.Cell(1, 8).Value = "Player 2.2";
 
         // One simple game
-        worksheet.Cells[2, 1].Value = "Round 1";
-        worksheet.Cells[2, 2].Value = 1;
-        worksheet.Cells[2, 3].Value = "John";
-        worksheet.Cells[2, 4].Value = "Doe";
-        worksheet.Cells[2, 7].Value = "Jane";
-        worksheet.Cells[2, 8].Value = "Smith";
+        ws.Cell(2, 1).Value = "Round 1";
+        ws.Cell(2, 2).Value = 1;
+        ws.Cell(2, 3).Value = "John";
+        ws.Cell(2, 4).Value = "Doe";
+        ws.Cell(2, 7).Value = "Jane";
+        ws.Cell(2, 8).Value = "Smith";
 
         var stream = new MemoryStream();
-        package.SaveAs(stream);
+        workbook.SaveAs(stream);
         stream.Position = 0;
         return stream;
     }

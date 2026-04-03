@@ -1,4 +1,4 @@
-using OfficeOpenXml;
+using ClosedXML.Excel;
 
 namespace SuledFunctions.IntegrationTests.Helpers;
 
@@ -7,47 +7,41 @@ namespace SuledFunctions.IntegrationTests.Helpers;
 /// </summary>
 public static class ExcelTestHelper
 {
-    static ExcelTestHelper()
-    {
-        // Configure EPPlus license for tests (EPPlus 8+)
-        ExcelPackage.License.SetNonCommercialPersonal("Integration Tests");
-    }
-
     /// <summary>
     /// Create a test Excel stream with tournament data
     /// </summary>
     public static MemoryStream CreateTournamentExcelStream(params (string round, int court, string p1_1, string p1_2, string p2_1, string p2_2)[] games)
     {
-        using var package = new ExcelPackage();
-        var worksheet = package.Workbook.Worksheets.Add("Tournament");
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("Tournament");
 
-        // Add header row
-        worksheet.Cells[1, 1].Value = "Round";
-        worksheet.Cells[1, 2].Value = "Court";
-        worksheet.Cells[1, 3].Value = "Player 1.1";
-        worksheet.Cells[1, 4].Value = "Player 1.2";
-        worksheet.Cells[1, 7].Value = "Player 2.1";
-        worksheet.Cells[1, 8].Value = "Player 2.2";
+        // Header row
+        ws.Cell(1, 1).Value = "Round";
+        ws.Cell(1, 2).Value = "Court";
+        ws.Cell(1, 3).Value = "Player 1.1";
+        ws.Cell(1, 4).Value = "Player 1.2";
+        ws.Cell(1, 7).Value = "Player 2.1";
+        ws.Cell(1, 8).Value = "Player 2.2";
 
-        // Add game data
+        // Game data
         for (int i = 0; i < games.Length; i++)
         {
             int row = i + 2;
             var game = games[i];
 
             if (!string.IsNullOrEmpty(game.round))
-                worksheet.Cells[row, 1].Value = game.round;
+                ws.Cell(row, 1).Value = game.round;
             if (game.court > 0)
-                worksheet.Cells[row, 2].Value = game.court;
+                ws.Cell(row, 2).Value = game.court;
 
-            worksheet.Cells[row, 3].Value = game.p1_1;
-            worksheet.Cells[row, 4].Value = game.p1_2;
-            worksheet.Cells[row, 7].Value = game.p2_1;
-            worksheet.Cells[row, 8].Value = game.p2_2;
+            ws.Cell(row, 3).Value = game.p1_1;
+            ws.Cell(row, 4).Value = game.p1_2;
+            ws.Cell(row, 7).Value = game.p2_1;
+            ws.Cell(row, 8).Value = game.p2_2;
         }
 
         var stream = new MemoryStream();
-        package.SaveAs(stream);
+        workbook.SaveAs(stream);
         stream.Position = 0;
         return stream;
     }
