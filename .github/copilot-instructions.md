@@ -20,7 +20,7 @@
 - **REQUIRED STEP**: Run integration tests (requires Docker): `dotnet test`
 - **DO NOT** present work as complete until ALL tests pass
 - Fix any failing tests before considering the refactoring complete
-- Ensure all 87+ unit tests pass before committing
+- Ensure all tests pass before committing
 - **WORKFLOW**: Code change → Run tests → Fix failures → Verify passing → THEN report complete
 
 ### Test Maintenance
