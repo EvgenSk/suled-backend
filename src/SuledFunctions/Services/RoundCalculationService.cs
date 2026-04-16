@@ -7,20 +7,13 @@ namespace SuledFunctions.Services;
 /// <summary>
 /// Service for calculating round schedules based on tournament metadata
 /// </summary>
-public class RoundCalculationService : IRoundCalculationService
+public class RoundCalculationService(ILogger<RoundCalculationService> logger) : IRoundCalculationService
 {
-    private readonly ILogger<RoundCalculationService> _logger;
-    
     // Default assumptions if not specified
     private const int DefaultWarmupMinutes = 5;
     private const int DefaultBreakBetweenRoundsMinutes = 5;
     private static readonly TimeSpan DefaultStartTime = new TimeSpan(9, 0, 0); // 9:00 AM
     private static readonly TimeSpan DefaultEndTime = new TimeSpan(18, 0, 0); // 6:00 PM
-
-    public RoundCalculationService(ILogger<RoundCalculationService> logger)
-    {
-        _logger = logger;
-    }
 
     public List<TournamentRound> CalculateRounds(Tournament tournament)
     {
@@ -29,7 +22,7 @@ public class RoundCalculationService : IRoundCalculationService
 
         if (roundNumbers.Count == 0)
         {
-            _logger.LogWarning("Cannot calculate rounds: tournament has no rounds");
+            logger.LogWarning("Cannot calculate rounds: tournament has no rounds");
             return [];
         }
 
@@ -50,7 +43,7 @@ public class RoundCalculationService : IRoundCalculationService
             currentTime = roundEnd.AddMinutes(DefaultBreakBetweenRoundsMinutes);
         }
 
-        _logger.LogInformation("Calculated {Count} rounds for tournament {TournamentId}",
+        logger.LogInformation("Calculated {Count} rounds for tournament {TournamentId}",
             rounds.Count, tournament.Id);
         return rounds;
     }
@@ -64,7 +57,7 @@ public class RoundCalculationService : IRoundCalculationService
         var available = (endTime - startTime).TotalMinutes - warmupMinutes - totalBreakMinutes;
         var duration = available / roundCount;
 
-        _logger.LogInformation(
+        logger.LogInformation(
             "Round duration calculated: {RoundDuration:F1} min ({RoundCount} rounds, {TotalDay} min day, {Warmup} min warmup, {Breaks} min total breaks)",
             duration, roundCount, (endTime - startTime).TotalMinutes, warmupMinutes, totalBreakMinutes);
         return duration;

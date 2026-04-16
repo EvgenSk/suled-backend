@@ -13,24 +13,14 @@ namespace SuledFunctions.Services;
 /// <summary>
 /// Service for managing tournaments with business logic
 /// </summary>
-public class TournamentService : ITournamentService
+public class TournamentService(
+    ITournamentRepository repository,
+    IExcelMetadataExtractor metadataExtractor,
+    IOptions<TournamentSettings> settings,
+    ILogger<TournamentService> logger)
+    : ITournamentService
 {
-    private readonly ITournamentRepository _repository;
-    private readonly IExcelMetadataExtractor _metadataExtractor;
-    private readonly ILogger<TournamentService> _logger;
-    private readonly TournamentSettings _settings;
-
-    public TournamentService(
-        ITournamentRepository repository,
-        IExcelMetadataExtractor metadataExtractor,
-        IOptions<TournamentSettings> settings,
-        ILogger<TournamentService> logger)
-    {
-        _repository = repository;
-        _metadataExtractor = metadataExtractor;
-        _logger = logger;
-        _settings = settings.Value;
-    }
+    private readonly TournamentSettings _settings = settings.Value;
 
     public async Task<List<Tournament>> GetTournamentsAsync(
         DateTime? startDateFrom = null,
@@ -43,15 +33,15 @@ public class TournamentService : ITournamentService
         try
         {
             var querySpec = BuildQuerySpec(startDateFrom, startDateTo, location, division, status, maxResults);
-            var compactTournaments = await _repository.QueryAsync(querySpec);
+            var compactTournaments = await repository.QueryAsync(querySpec);
             var tournaments = ExpandAndRefreshStatus(compactTournaments);
             var result = FilterAndSort(tournaments, querySpec);
-            _logger.LogInformation("Retrieved {Count} tournaments", result.Count);
+            logger.LogInformation("Retrieved {Count} tournaments", result.Count);
             return result;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving tournaments");
+            logger.LogError(ex, "Error retrieving tournaments");
             throw;
         }
     }
@@ -63,7 +53,7 @@ public class TournamentService : ITournamentService
             if (string.IsNullOrWhiteSpace(id))
                 throw new ValidationException("id", "Tournament ID cannot be empty");
 
-            var compact = await _repository.GetByIdAsync(id);
+            var compact = await repository.GetByIdAsync(id);
             return compact == null ? null : TournamentCompactMapper.FromCompact(compact);
         }
         catch (ValidationException)
@@ -72,7 +62,7 @@ public class TournamentService : ITournamentService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving tournament {TournamentId}", id);
+            logger.LogError(ex, "Error retrieving tournament {TournamentId}", id);
             throw;
         }
     }
@@ -92,7 +82,7 @@ public class TournamentService : ITournamentService
     {
         var tournaments = compactTournaments.Select(TournamentCompactMapper.FromCompact).ToList();
         foreach (var t in tournaments)
-            _metadataExtractor.DetermineStatus(t);
+            metadataExtractor.DetermineStatus(t);
         return tournaments;
     }
 

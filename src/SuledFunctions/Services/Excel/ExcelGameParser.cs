@@ -15,45 +15,29 @@ public class ExcelGameParser(ILogger<ExcelGameParser> logger) : IExcelGameParser
     /// </summary>
     public List<Game> ParseGames(string[][] rows, string tournamentId)
     {
-        var games = new List<Game>();
-        
-        // Check if there is any data beyond the header
         if (rows.Length <= 1)
         {
             logger.LogWarning("Worksheet is empty, no data to parse");
-            return games;
+            return [];
         }
-        
+
+        var games = new List<Game>();
         int currentRound = 1;
-        
+
         // Start from row index 1 (skipping header row 0)
         for (int rowIdx = 1; rowIdx < rows.Length; rowIdx++)
         {
             try
             {
-                // Skip empty rows
-                if (IsEmptyRow(rows, rowIdx))
-                {
-                    continue;
-                }
+                if (IsEmptyRow(rows, rowIdx)) continue;
 
-                // Check if this is a round header (game data starts on the same row)
-                var firstCell = GetCell(rows, rowIdx, 0).Trim();
-                if (firstCell.StartsWith("Round", StringComparison.OrdinalIgnoreCase) ||
-                    firstCell.StartsWith("Runde", StringComparison.OrdinalIgnoreCase))
-                {
-                    // Extract round number if present
-                    var roundText = firstCell.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                    if (roundText.Length > 1 && int.TryParse(roundText[1], out int roundNumber))
-                    {
-                        currentRound = roundNumber;
-                    }
-                    // Don't skip - game data is on the same row, continue parsing below
-                }
+                // Update round counter if this row starts a new round; game data may be on the same row
+                if (TryExtractRoundNumber(GetCell(rows, rowIdx, 0).Trim(), out int roundNumber))
+                    currentRound = roundNumber;
 
                 var game = ParseGameRow(rows, rowIdx, currentRound, tournamentId);
-                if (game == null) continue;
-                
+                if (game is null) continue;
+
                 games.Add(game);
                 logger.LogDebug("Parsed game: Court {Court}, Round {Round}, {Pair1} vs {Pair2}",
                     game.CourtNumber, game.Round, game.Pair1.DisplayName, game.Pair2.DisplayName);
@@ -65,6 +49,20 @@ public class ExcelGameParser(ILogger<ExcelGameParser> logger) : IExcelGameParser
         }
 
         return games;
+    }
+
+    /// <summary>
+    /// Returns true when <paramref name="cell"/> begins with a round keyword and contains a parseable round number.
+    /// </summary>
+    private static bool TryExtractRoundNumber(string cell, out int roundNumber)
+    {
+        roundNumber = 0;
+        if (!cell.StartsWith("Round", StringComparison.OrdinalIgnoreCase) &&
+            !cell.StartsWith("Runde", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var parts = cell.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length > 1 && int.TryParse(parts[1], out roundNumber);
     }
 
     private Game? ParseGameRow(string[][] rows, int rowIdx, int round, string tournamentId)
