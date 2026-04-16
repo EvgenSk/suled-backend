@@ -178,5 +178,5 @@ jobs:
         subscriptionId: ${{ vars.AZURE_SUBSCRIPTION_ID }}
         resourceGroupName: ${{ vars.AZURE_RESOURCE_GROUP_DEV }}
         template: ./infra/main.bicep
-        parameters: ./infra/main.bicepparam environment=dev
+        parameters: ./infra/main.bicepparam
         failOnStdErr: false
