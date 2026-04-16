@@ -245,6 +245,23 @@ public class ExcelMetadataExtractorTests
         tournament.Status.Should().Be(TournamentStatus.Completed);
     }
 
+    [Fact]
+    public void ExtractFromExcel_WithTimeInHhMmSsFormat_ExtractsCorrectly()
+    {
+        // ExcelParserService normalises time-only Excel cells to "HH:mm:ss" before passing
+        // them to the extractor. Verify that format round-trips correctly.
+        var tournament = new Tournament();
+        var rows = CreateMetadataRows(
+            ("Start Time:", "21:50:00"),
+            ("End Time:", "23:30:00")
+        );
+
+        _extractor.ExtractFromExcel(tournament, rows);
+
+        tournament.StartTime.Should().Be(new TimeSpan(21, 50, 0));
+        tournament.EndTime.Should().Be(new TimeSpan(23, 30, 0));
+    }
+
     /// <summary>
     /// Creates a string[][] where metadata labels are in column index 9 and values in column index 10.
     /// </summary>

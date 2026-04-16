@@ -356,6 +356,40 @@ public class ExcelParserServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ParseTournamentAsync_WithTimeTypedCells_ExtractsStartAndEndTime()
+    {
+        // Arrange: time cells written as actual TimeSpan values (not strings).
+        // ClosedXML stores these as numeric fractions; ExcelDataReader reads them back
+        // as DateTime objects with year 1899 (the Excel time epoch).
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("Tournament");
+
+        ws.Cell(1, 10).Value = "Start Time:";
+        ws.Cell(1, 11).Value = new TimeSpan(9, 0, 0);   // time-typed cell, not a string
+        ws.Cell(2, 10).Value = "End Time:";
+        ws.Cell(2, 11).Value = new TimeSpan(21, 50, 0);  // time-typed cell, not a string
+
+        // Add a game row so parsing proceeds
+        ws.Cell(3, 1).Value = "Round 1";
+        ws.Cell(3, 2).Value = 1;
+        ws.Cell(3, 3).Value = "John Doe";
+        ws.Cell(3, 4).Value = "Jane Smith";
+        ws.Cell(3, 7).Value = "Alice Brown";
+        ws.Cell(3, 8).Value = "Bob White";
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        stream.Position = 0;
+
+        // Act
+        var result = await _service.ParseTournamentAsync(stream, "test.xlsx");
+
+        // Assert
+        result.StartTime.Should().Be(new TimeSpan(9, 0, 0));
+        result.EndTime.Should().Be(new TimeSpan(21, 50, 0));
+    }
+
+    [Fact]
     public async Task ParseTournamentAsync_CalculatesRounds()
     {
         // Arrange
