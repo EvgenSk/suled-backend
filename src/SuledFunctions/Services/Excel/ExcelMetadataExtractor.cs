@@ -173,14 +173,20 @@ public class ExcelMetadataExtractor(ILogger<ExcelMetadataExtractor> logger) : IE
         
         var now = DateTime.UtcNow;
         var startDate = tournament.StartDate.Value.Date;
-        // When no explicit end date, treat the tournament as running for the full calendar day
-        // (end = start of next day). This avoids spuriously marking same-day tournaments
-        // as Completed the moment they are uploaded, since StartDate is midnight.
+        // If a StartTime is available, incorporate it so that a same-day tournament
+        // is only considered InProgress once the actual start time has passed.
+        var startDateTime = tournament.StartTime.HasValue
+            ? startDate.Add(tournament.StartTime.Value)
+            : startDate;
+        // Tournaments that have no explicit EndDate finish on the same day they start.
+        // Use EndTime when available for a precise boundary; otherwise end of that calendar day.
         var endDate = tournament.EndDate.HasValue
             ? tournament.EndDate.Value
-            : startDate.AddDays(1);
+            : tournament.EndTime.HasValue
+                ? startDate.Add(tournament.EndTime.Value)
+                : startDate.AddDays(1);
         
-        if (now < startDate)
+        if (now < startDateTime)
         {
             tournament.Status = TournamentStatus.Upcoming;
         }
